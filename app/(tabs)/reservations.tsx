@@ -19,7 +19,9 @@ export default function ReservationsTab() {
       title="Necesitás iniciar sesión"
       body="Iniciá sesión para ver tus reservas y las reservas de tus cargadores."
       ctaLabel="Iniciá sesión"
-      onCtaPress={() => router.push('/login?returnTo=/reservations')}
+      // Phase 3 (auth) owns the login route. Cast via `as never` so the
+      // typed-routes pass until Phase 3 lands.
+      onCtaPress={() => router.push('/login?returnTo=/reservations' as never)}
     />
   );
 }

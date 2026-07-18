@@ -20,7 +20,9 @@ export default function MessagesTab() {
       title="Necesitás iniciar sesión"
       body="Iniciá sesión para ver tus conversaciones con anfitriones y huéspedes."
       ctaLabel="Iniciá sesión"
-      onCtaPress={() => router.push('/login?returnTo=/messages')}
+      // Phase 3 (auth) owns the login route. Cast via `as never` so the
+      // typed-routes pass until Phase 3 lands.
+      onCtaPress={() => router.push('/login?returnTo=/messages' as never)}
     />
   );
 }

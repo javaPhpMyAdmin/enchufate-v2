@@ -19,7 +19,9 @@ export default function ProfileTab() {
       title="Iniciá sesión para gestionar tu cuenta"
       body="Publicá cargadores, editá tu perfil y revisá tus estadísticas desde acá."
       ctaLabel="Iniciá sesión"
-      onCtaPress={() => router.push('/login?returnTo=/profile')}
+      // Phase 3 (auth) owns the login route. Cast via `as never` so the
+      // typed-routes pass until Phase 3 lands.
+      onCtaPress={() => router.push('/login?returnTo=/profile' as never)}
     />
   );
 }
