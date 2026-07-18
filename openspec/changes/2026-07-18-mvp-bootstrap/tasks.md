@@ -398,6 +398,32 @@ Phase 1 (Foundation)
 
 > **Phase 4 PR**: tasks 4.1 → 4.6. ~720 lines. Single PR is feasible under the 800 budget.
 
+### Task 4.1: Filter store + location helper
+
+- **Status (apply-phase-4, 2026-07-18)**: ✅ Complete. `src/stores/filterStore.ts` (97 lines) exposes `filters` + `draft` (the draft+apply pattern) and `setDraft/applyDraft/resetFilters`. `src/lib/location.ts` (92 lines) wraps `expo-location` with `requestLocationPermission/getCurrentPosition/getLastKnownPosition/URUGUAY_FALLBACK`. Committed as `bf390f5`.
+
+### Task 4.2: Inicio screen + home assets preload
+
+- **Status (apply-phase-4, 2026-07-18)**: ✅ Complete. `app/(tabs)/index.tsx` now renders the Enchufate wordmark + `home_card_.png` hero + two CTA cards (Buscar → /(tabs)/map; Publicar → /publish/1-name as `never`-cast). Committed as `141c2fd`.
+
+### Task 4.3: useChargers hook + chargers table migration
+
+- **Status (apply-phase-4, 2026-07-18)**: ✅ Complete (mock data path; real Supabase swap lands in Phase 6). `src/features/chargers/{types.ts, data/mockChargers.ts, hooks/useChargers.ts}` (~467 lines source) and `supabase/migrations/20260718000001_init_chargers.sql` (64 lines, no RLS). 15 hardcoded chargers around Montevideo. Committed as `c630ce3`.
+
+### Task 4.4: Map screen + pins + recenter FAB + native clustering
+
+- **Status (apply-phase-4, 2026-07-18)**: ✅ Complete. `app/(tabs)/map.tsx` rewritten with `@maplibre/maplibre-react-native@11.3.6` (Map + GeoJSONSource cluster: true + clusterMaxZoom: 14 + 3 Layers: cluster circle / cluster count symbol / individual `cargador.png` symbol). OpenFreeMap liberty style; OSM attribution footer. FAB anchored bottom-right; Filtros pill at top. Pin tap logs to console (Phase 6 will navigate to /charger/[id]). Committed as `ddc4a3e` (alongside the 4 openspec documentation updates for the MapLibre decision).
+
+### Task 4.5: FiltersSheet organism + 5 chip-group sections
+
+- **Status (apply-phase-4, 2026-07-18)**: ✅ Complete. `src/components/organisms/FiltersSheet.tsx` (212 lines) — first organism. Wraps `@gorhom/bottom-sheet@5` `BottomSheetModal` with snap points 25/50/90%, 5 sections (Estado / Conector / Potencia / Precio / Distancia) rendered via `FilterChipRow`. Reset clears both draft + filters; Aplicar commits draft and closes. Committed as `4bf293c`.
+
+### Task 4.6: Tab bar layout (5 tabs) + per-tab EmptyState wiring
+
+- **Status (apply-phase-4, 2026-07-18)**: ✅ Complete. `app/_layout.tsx` got `BottomSheetModalProvider` between SafeAreaProvider and Stack (required by the Filtros sheet). `app/(tabs)/{messages,reservations,profile}.tsx` got `as never` casts on the `/login?returnTo=...` router.push calls (the `/login` route lands in Phase 3; Expo Router 404s silently until then). Committed as `ba2a8d4`.
+
+> **Phase 4 actual**: tasks 4.1 → 4.6. **7 work-unit commits**, ~1307 source lines (over the 800 budget — see return summary for `size:exception` rationale; work-unit commits keep each chunk under ~200 lines so the PR is reviewable per-commit).
+
 ---
 
 ## Phase 5: Auth-gated tabs (Mensajes + Reservas + Profile)
