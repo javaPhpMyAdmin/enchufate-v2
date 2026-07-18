@@ -11,11 +11,17 @@
  * key is NEVER used here — that bypasses RLS and belongs only on
  * the server (Edge Functions).
  *
- * The `Database` generic is intentionally `any` for Phase 1. It will
- * be replaced with the generated types from `supabase gen types
- * typescript` in Phase 3, once the schema migrations are in place.
+ * Auth token persistence uses the `expo-secure-store` adapter
+ * (`secureStorage`) so the refresh token lives in the iOS Keychain
+ * / Android EncryptedSharedPreferences — never in plain text on
+ * disk. The `Database` generic will get the real generated types
+ * in Phase 3 (after the first Supabase migration); the placeholder
+ * shape lets us type the client today without a schema.
  */
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
+
+import type { Database } from './database.types';
+import { secureStorage } from './secureStorage';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -28,20 +34,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-/**
- * Shared Supabase client. Typed with a placeholder `Database` shape
- * until the generated types land in Phase 3.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const supabase: SupabaseClient<any> = createClient(
-  supabaseUrl,
-  supabaseAnonKey,
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      // Expo Go / native don't use URL-based session detection.
-      detectSessionInUrl: false,
-    },
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: secureStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    // Expo Go / native don't use URL-based session detection.
+    detectSessionInUrl: false,
   },
-);
+});
