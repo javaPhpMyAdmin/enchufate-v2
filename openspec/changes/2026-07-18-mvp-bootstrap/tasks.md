@@ -354,18 +354,23 @@ Phase 1 (Foundation)
   - The hook reads `filters` from `useFilterStore()` and passes them to `.from('chargers').select()`.
 - **Commit strategy**: 2 commits — `feat(db): add chargers table migration (no RLS yet)` then `feat(chargers): add useChargers hook with filter passthrough`.
 
-### Task 4.4: Map screen + pins + recenter FAB
+### Task 4.4: Map screen + pins + recenter FAB + native clustering
 
-- **Files**: `/Users/marcelobatista/Desktop/enchufate-V2/app/(public)/map.tsx` (~150), `app.json` (+10 lines for location permission strings).
-- **Estimated lines**: ~160 lines.
+- **Files**: `/Users/marcelobatista/Desktop/enchufate-V2/app/(public)/map.tsx` (~180), `app.json` (+10 lines for location permission strings).
+- **Estimated lines**: ~190 lines.
 - **Dependencies**: 2.2, 4.1, 4.3.
 - **Acceptance criteria**:
-  - `react-native-maps` is installed; `MapView` uses `PROVIDER_GOOGLE` and a default region covering Uruguay.
+  - `@maplibre/maplibre-react-native` is installed via `pnpm`; `MapView` uses OpenFreeMap's `liberty` style URL and a region covering Uruguay (default: Montevideo -34.9, -56.16, zoom 11).
+  - **Native clustering enabled**: charger pins are a `ShapeSource` with `cluster: true`, `clusterRadius: 50`, `clusterMaxZoom: 14`. The cluster count renders in a `SymbolLayer` (no extra plugin needed).
+  - At zoom < 14 the user sees clusters (with count bubble); at zoom >= 14 the individual `cargador.png` pins render.
   - Markers use the preloaded `cargador.png` asset; each is `tappable` and navigates to `/charger/[id]` (route is built but the screen lives in Phase 6 — Expo Router will 404 gracefully until then).
   - FAB is anchored bottom-right and recenters the map on user location (or Uruguay fallback).
   - On first mount, `requestLocationPermission()` is called.
   - A denied permission triggers a one-time toast "Activá la ubicación para centrar el mapa" (toast component lands in Phase 8; for now a console.warn is acceptable).
-- **Commit strategy**: 2 commits — `feat(map): add Google Maps view with charger pins and recenter FAB` then `chore: add iOS/Android location permission strings to app.json`.
+  - `app.json` includes the location permission strings (NSLocationWhenInUseUsageDescription on iOS, ACCESS_FINE_LOCATION on Android).
+  - **OSM attribution is visible**: "© OpenFreeMap © OpenStreetMap contributors" (OSM ToS requirement).
+  - **No tokens, no env vars** — OpenFreeMap is open and keyless.
+- **Commit strategy**: 3 commits — `chore(deps): add @maplibre/maplibre-react-native` then `feat(map): add MapLibre view with OpenFreeMap tiles, charger pins, clusters, and recenter FAB` then `chore: add iOS/Android location permission strings to app.json`.
 
 ### Task 4.5: FiltersSheet organism + 5 chip-group sections
 

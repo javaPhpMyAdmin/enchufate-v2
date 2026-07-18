@@ -28,7 +28,7 @@ Enchufate-V2 is greenfield: no `package.json`, no `app.json`, no Supabase wiring
 | 2 | Design system primitives (Button, Card, Input, Chip, StatusPill, BetaBanner, FAB) + tokens (color, spacing, radius, typography) | Light theme only |
 | 3 | 5-tab navigation (Inicio, Mapa, Mensajes, Reservas, Perfil) with auth-aware per-tab empty states | Mensajes / Reservas / Perfil require login; Inicio / Mapa are public |
 | 4 | Auth: email/password + Google OAuth via Supabase; "Olvidé mi contraseña"; "Crear cuenta" | Email verification kept (Supabase default) |
-| 5 | Inicio (hero + 2 CTA cards) and Mapa (Google Maps + custom `cargador.png` pin + recenter FAB) | Public |
+| 5 | Inicio (hero + 2 CTA cards) and Mapa (MapLibre + custom `cargador.png` pin + native clustering + recenter FAB) | Public; uses `@maplibre/maplibre-react-native` with OpenFreeMap tiles, no tokens required |
 | 6 | Filtros bottom sheet (5 categories: Estado, Conector, Potencia, Precio, Distancia) | Filter state persists across re-renders |
 | 7 | Charger detail screen (`app/charger/[id].tsx`) — photo gallery, map snippet, host, full description, "Reservar" CTA | NEW — not in wireframes; gap filled by exploration |
 | 8 | Publicar wizard — 7 steps + success screen; auth-gated; step 6 = "Horario / Disponibilidad" (TBD — see open questions) | Native image picker (5 photos max) |

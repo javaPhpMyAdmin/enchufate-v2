@@ -866,15 +866,26 @@ The root `app/_layout.tsx` listens to `supabase.auth.onAuthStateChange` and seed
 
 ## 8. Map implementation
 
-### 8.1 Library choice: `react-native-maps`
+### 8.1 Library choice: `@maplibre/maplibre-react-native` (MapLibre)
 
 | Choice | Why |
 |--------|-----|
-| `react-native-maps` 1.18+ with `PROVIDER_GOOGLE` | Expo SDK 54 supports it without extra config; required for Android Google tiles and iOS consistency. |
-| Rejected: `@rnmapbox/maps` | Requires Mapbox token + commercial terms; overkill for a beta. |
-| Rejected: `react-native-mapbox-gl/maps` | Same as above. |
+| `@maplibre/maplibre-react-native` 10.x with `MapView` from SDK | Native iOS + Android; native clustering built-in (`cluster: true` on the GeoJSON source); fork of Mapbox GL JS pre-license-change; **no account or tokens required**; tiles via OpenFreeMap (OSM-based, no rate limits for low traffic). |
+| Rejected: `react-native-maps` + `PROVIDER_GOOGLE` | Google Maps tiles; requires Google Cloud project + billing card + API key; more expensive at scale; clustering requires third-party plugins. |
+| Rejected: `@rnmapbox/maps` (Mapbox) | Requires Mapbox account + 2 secret tokens. User encountered an account-creation blocker on https://account.mapbox.com/ — error message about ad blocker / VPN / network, no way to debug from here. MapLibre is the open-source alternative that ships the same MapView API. |
 
-The `cargador.png` asset is passed to `<Marker icon={...} />`; the system handles scaling and z-order. We register the marker image with `markerImage.loadAsync()` once in the map screen's `useEffect` and reuse the reference.
+**Tile provider:** OpenFreeMap (https://openfreemap.org/) — free, OSM-based, no key required for low-traffic apps. The default style URL is `https://tiles.openfreemap.org/styles/liberty`. The style can be swapped later via Maputnik (open-source style editor) without changing the app code.
+
+**Trade-offs vs Google Maps and Mapbox:**
+- ✅ **Zero setup** — no account, no tokens, no billing card. Just `pnpm add` and it works.
+- ✅ Native clustering — same `cluster: true` API as Mapbox
+- ✅ Same MapView paradigm as Mapbox (it's the same codebase, forked before the license change)
+- ✅ Tiles are open data (OpenStreetMap contributors)
+- ⚠️ Native dep: `@maplibre/maplibre-react-native` requires `expo prebuild` (already triggered for `expo-secure-store` in Phase 1, no extra step)
+- ⚠️ Tile rendering is a touch less polished than Mapbox (acceptable for MVP; can be upgraded later with MapTiler free tier if needed)
+- ⚠️ Attribution MUST be visible: "© OpenFreeMap © OpenStreetMap contributors" (OSM ToS requirement)
+
+The `cargador.png` asset is passed to a `SymbolLayer` (MapLibre/Mapbox terminology) at zoom >= 14; below that, clusters are rendered as bubbles with their count via a separate `SymbolLayer`. The marker image is registered with `mapRef.current?.getLayer()` once in the map screen's `useEffect`. Clustering is configured on the `ShapeSource` as `{ cluster: true, clusterRadius: 50, clusterMaxZoom: 14 }`. Tiles come from OpenFreeMap's `liberty` style (no key required).
 
 ### 8.2 Filtros bottom sheet
 
