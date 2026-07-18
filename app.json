@@ -38,10 +38,18 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "@maplibre/maplibre-react-native"
+      "@maplibre/maplibre-react-native",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "89baec1c-7fdd-4972-a65b-5f5fd5f490e7"
+      }
+    },
+    "owner": "chelobat.dev"
   }
 }
