@@ -1,0 +1,2 @@
+# Auth feature — hooks (useSession, useRequireAuth, useSignIn, useSignUp, useSignOut,
+# useGoogleOAuth, useResetPassword) + types. Populated in Phase 3.

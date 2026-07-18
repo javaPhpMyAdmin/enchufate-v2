@@ -1,0 +1,3 @@
+# Reservations feature — hooks (useReservations, useReservation, useCreateReservation,
+# useConfirmReservation, useCancelReservation) + types. Populated in Phase 5 (read) and
+# Phase 7 (mutations + state machine).

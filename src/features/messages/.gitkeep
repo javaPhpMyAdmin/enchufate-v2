@@ -1,0 +1,2 @@
+# Messaging feature — hooks (useConversations, useMessages, useSendMessage) + types.
+# Populated in Phase 5 (read) and Phase 7 (Realtime + Edge Function wiring).

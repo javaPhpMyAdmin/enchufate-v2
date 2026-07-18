@@ -1,0 +1,3 @@
+# Shared library code — Supabase client, queryClient, error normalizer, formatters,
+# location helper, image upload, Zod schemas, secure storage adapter. Populated
+# incrementally across Phases 1-6.
