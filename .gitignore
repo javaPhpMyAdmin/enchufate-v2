@@ -1,0 +1,49 @@
+# OSX
+.DS_Store
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+pnpm-debug.log*
+*.log
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+*.tsbuildinfo
+
+# Native build artifacts
+ios/
+android/
+
+# Metro
+.metro-health-check*
+
+# Editors
+.vscode/
+.idea/
+
+# Env (NEVER commit the .env file — only .env.example is committed)
+.env
+.env*.local
+
+# gentle-ai tooling state (not project source)
+.atl/
+.agents/
+skills-lock.json
+
+# Supabase CLI local temp (created by `supabase link` / `supabase db push`)
+supabase/.temp/
+
+# Wireframes — V2 design references received via WhatsApp.
+# Kept locally for review; excluded from git history to avoid bloating
+# the repo with 30+ binary mockups. Will be deleted once V2 design
+# is finalized (see openspec/ONBOARDING.md).
+docs/wireframes/
+
+# Binary mockup assets received via WhatsApp during design phase
+# (assets/icon.png, assets/images/*.png, assets/icons/*.png ARE committed)
+*.jpeg
