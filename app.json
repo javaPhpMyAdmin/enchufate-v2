@@ -15,14 +15,21 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.enchufate.app"
+      "bundleIdentifier": "com.enchufate.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Enchufate usa tu ubicación para mostrar cargadores cercanos y centrar el mapa."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#FF6B1F"
       },
-      "package": "com.enchufate.app"
+      "package": "com.enchufate.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -30,7 +37,8 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      "@maplibre/maplibre-react-native"
     ],
     "experiments": {
       "typedRoutes": true
