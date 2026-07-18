@@ -1,21 +1,38 @@
 /**
- * Theme tokens — empty placeholders for Phase 1.
+ * Theme — single import surface for every token.
  *
- * The shape (colors, spacing, radius, typography, shadows) is locked
- * in here; the actual values land in Phase 2 (Design System) per
- * `design.md §5.1`. Once populated, every screen consumes these
- * tokens instead of hardcoded values.
- *
- * Keep this file as the single import surface for theme values:
  *   import { colors, spacing, radius, typography, shadows } from '@/theme';
+ *
+ * The bundled `theme` object groups all five so consumers that
+ * need several at once (e.g. Card) don't have to destructure.
  */
+export { colors } from './colors';
+export type { ColorToken } from './colors';
 
-export const colors = {} as const;
+export { spacing } from './spacing';
+export type { SpacingToken } from './spacing';
 
-export const spacing = {} as const;
+export { radius } from './radius';
+export type { RadiusToken } from './radius';
 
-export const radius = {} as const;
+export { typography } from './typography';
+export type { TypographyToken } from './typography';
 
-export const typography = {} as const;
+export { shadows } from './shadows';
+export type { ShadowToken } from './shadows';
 
-export const shadows = {} as const;
+import { colors as _colors } from './colors';
+import { spacing as _spacing } from './spacing';
+import { radius as _radius } from './radius';
+import { typography as _typography } from './typography';
+import { shadows as _shadows } from './shadows';
+
+export const theme = {
+  colors: _colors,
+  spacing: _spacing,
+  radius: _radius,
+  typography: _typography,
+  shadows: _shadows,
+} as const;
+
+export type Theme = typeof theme;
