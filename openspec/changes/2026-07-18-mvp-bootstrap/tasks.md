@@ -134,6 +134,7 @@ Phase 1 (Foundation)
   - `.gitignore` includes `*.jpeg`, `node_modules/`, `.expo/`, `dist/`, `*.log`, `.env*`, `docs/wireframes/`, `*.tsbuildinfo`, `.idea/`, `.vscode/`.
   - `git log` shows the first commit with just `.gitignore` + `assets/` + `openspec/` (no wireframe JPEGs).
 - **Commit strategy**: 1 commit — `chore: initialize git repo and exclude wireframe JPEGs from history`.
+- **Status (apply-phase-1, 2026-07-18)**: ✅ Complete. Committed as `ba7c28b`. Wireframes moved to `docs/wireframes/` and gitignored.
 
 ### Task 1.2: Expo init + TS strict + path alias
 
@@ -146,6 +147,7 @@ Phase 1 (Foundation)
   - `paths: { "@/*": ["src/*"] }` resolves in `babel.config.js` and `tsconfig.json`.
   - `pnpm expo prebuild --no-install` runs (does not need to fully complete yet).
 - **Commit strategy**: 2 commits — `chore: scaffold Expo SDK 54 + TypeScript strict + path alias` then `chore: add EAS Build placeholder config`.
+- **Status (apply-phase-1, 2026-07-18)**: ✅ Complete. Committed as `531d2a4`. `pnpm install` succeeded (Expo 54.0.36, RN 0.81.5, React 19.1, expo-router 6.0.24, @supabase/supabase-js 2.110.7, @tanstack/react-query 5.101.2, zustand 5.0.14). `pnpm tsc --noEmit` passes; `pnpm expo export --platform ios` succeeds. The two commits were collapsed into one (`531d2a4`) since EAS config and the rest of the scaffold are too small to be reviewable independently.
 
 ### Task 1.3: Supabase client + secure storage adapter
 
@@ -158,6 +160,7 @@ Phase 1 (Foundation)
   - `.env.example` documents `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
   - User has provided a fresh anon key (V1 token was revoked — first implementation blocker per `proposal.md` risks).
 - **Commit strategy**: 1 commit — `feat(lib): add typed Supabase client with SecureStore token adapter`.
+- **Status (apply-phase-1, 2026-07-18)**: ⚠️ Partial. `src/lib/supabase.ts` (47 lines) and `.env.example` (18 lines) shipped in commit `0b27a28`. The `ExpoSecureStoreAdapter` / `src/lib/secureStorage.ts` is **deferred** — the orchestrator's Phase 1 scope explicitly lists the client as "use `any` Database type for now, will be regenerated in Phase 3", and SecureStore is a peer of the auth code (Phase 3) that consumes the client. V1's working client does not yet use SecureStore either. Will land in Phase 3 with the auth hooks.
 
 ### Task 1.4: Shared lib utilities (queryClient, error, format)
 
@@ -170,6 +173,7 @@ Phase 1 (Foundation)
   - `format.ts` exports `formatRelativeTime(date)`, `formatCurrency(amount)`, `formatPowerKw(kw)`.
   - `features.ts` exports `EXPO_PUBLIC_FEATURE_*` flag reads.
 - **Commit strategy**: 2 commits — `feat(lib): add queryClient, error normalizer, and feature flag config` then `feat(lib): add formatters (relative time, currency, power)`.
+- **Status (apply-phase-1, 2026-07-18)**: ❌ Not started. **Deferred** — the orchestrator's Phase 1 scope explicitly limited the batch to "scaffolding, folder structure, empty stubs" with no app code. `queryClient`, `error.ts`, `format.ts`, `features.ts`, `database.types.ts` will land in a follow-up apply batch before Phase 3 (the auth hooks need the queryClient to mount a `QueryClientProvider`).
 
 ### Task 1.5: Root layout + AGENTS.md team conventions
 
@@ -181,6 +185,7 @@ Phase 1 (Foundation)
   - `+not-found.tsx` renders a friendly 404 with a "Volver al inicio" CTA.
   - `AGENTS.md` codifies: no V1 imports, all UI copy is Rioplatense voseo, no hex literals outside `src/theme/`, pnpm only, never commit `*.jpeg`.
 - **Commit strategy**: 2 commits — `feat(app): add root layout with providers and 404 screen` then `docs: add AGENTS.md team conventions for V2`.
+- **Status (apply-phase-1, 2026-07-18)**: ⚠️ Partial. `app/_layout.tsx` (16 lines, minimal Stack) and `app/(tabs)/_layout.tsx` (25 lines, 5-tab placeholder) shipped in commit `98709ea`. The 5 placeholder tab screens (`index`, `map`, `messages`, `reservations`, `profile`) are also included so Expo Router 6 typed routes resolves. The full provider tree (GestureHandlerRootView, QueryClientProvider, SafeAreaProvider, BottomSheetModalProvider, AuthProvider) is **deferred** — it depends on `queryClient.ts` (task 1.4) and the auth hooks (task 3.1). `+not-found.tsx` and `AGENTS.md` are also deferred. The 5-tab structure is the orchestrator's explicit ask, ahead of the full Phase 4 wiring.
 
 > **Phase 1 PR suggestion**: single PR `feat: scaffold enchufate-v2 Expo app (Phase 1)` bundling tasks 1.1 → 1.5. ~480 lines. Under 800.
 
