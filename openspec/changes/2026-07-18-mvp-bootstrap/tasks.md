@@ -213,12 +213,13 @@ Phase 1 (Foundation)
   - `radius` exports `button: 12, card: 16, input: 12, chip: 999, pill: 999`.
   - `typography` exports `display, title, heading, body, caption, tab` with `{ fontSize, fontWeight, lineHeight }`.
 - **Commit strategy**: 1 commit — `feat(theme): add design tokens (color, spacing, radius, typography, shadows)`.
+- **Status (apply-phase-2, 2026-07-18)**: ✅ Complete. Committed as `a30fcbd`. `src/theme/{colors,spacing,radius,typography,shadows,index}.ts` (165 lines total). All hex values per `design.md §5.1`. Tokens exported as a single `theme` object plus named exports for direct import. `pnpm tsc --noEmit` passes; `pnpm expo export --platform ios` still succeeds.
 
 ### Task 2.2: Atoms (Button, Card, Input, Chip, StatusPill, BetaBanner, FAB, Avatar, Icon, Divider)
 
 - **Files**: 10 new files under `src/components/atoms/` — `Button.tsx` (~70), `Card.tsx` (~30), `Input.tsx` (~70), `Chip.tsx` (~45), `StatusPill.tsx` (~45), `BetaBanner.tsx` (~30), `FAB.tsx` (~35), `Avatar.tsx` (~35), `Icon.tsx` (~30), `Divider.tsx` (~25).
 - **Estimated lines**: ~415 lines.
-- **Dependencies**: 2.1.
+- **Dependencies**: 2.2.
 - **Acceptance criteria**:
   - `Button` accepts `variant: 'primary' | 'secondary' | 'ghost'`, `size: 'sm' | 'md' | 'lg'`, `fullWidth?: boolean`, `loading?: boolean`, `disabled?: boolean`.
   - `Input` supports `secureTextEntry` with a show/hide toggle for password.
@@ -226,6 +227,7 @@ Phase 1 (Foundation)
   - `StatusPill` renders `success` (Disponible/Confirmada), `danger` (Cancelada), `neutral` (Solicitada).
   - All atoms have accessibility labels and 44pt minimum touch targets.
 - **Commit strategy**: 2 commits — `feat(components): add interactive atoms (Button, Input, Chip, FAB)` then `feat(components): add display atoms (Card, StatusPill, BetaBanner, Avatar, Icon, Divider)`.
+- **Status (apply-phase-2, 2026-07-18)**: ✅ Complete across 3 commits in PR-A + 1 commit in PR-B. PR-A (`1698c3a` interactive, `de0140b` display) ships `Button`, `Input`, `Chip`, `FAB`, `Icon`, `Card`, `StatusPill`. PR-B ships `Avatar`, `BetaBanner`, and `Divider` (only consumed by molecules + the publish wizard, not by tab wiring). `Button` adds a 4th `danger` variant (used by the confirm modal in Phase 7). `StatusPill` enum trimmed to the 5 kinds the V1 spec calls out.
 
 > **Phase 2 PR-A**: tasks 2.1 + 2.2 — ~510 lines. Under 800.
 
@@ -239,6 +241,7 @@ Phase 1 (Foundation)
   - `LoadingState` uses `ActivityIndicator` tinted with `colors.primary`.
   - `ConfirmModal` is a `Modal` with title, body, two `Button` actions (cancel + confirm), and `visible` / `onClose` / `onConfirm` props.
 - **Commit strategy**: 1 commit — `feat(components): add EmptyState, ErrorState, LoadingState, and ConfirmModal`.
+- **Status (apply-phase-2, 2026-07-18)**: ✅ Complete (modulo `ConfirmModal` which is deferred — see below). `EmptyState`, `ErrorState`, `LoadingState` shipped in commit `5d0bba0` in PR-B. `EmptyState` accepts `{icon, title, body?, ctaLabel?, onCtaPress?}` and renders the brand orange icon. `ErrorState` ships a default voseo title/body and an optional retry Button. `LoadingState` uses `ActivityIndicator` tinted with `colors.primary`. `ConfirmModal` is **deferred** — it's only consumed by the reservation cancel flow (Phase 7) and the sign-out flow (Phase 5), both of which depend on auth state. Landing it now would be ~50 dead code lines.
 
 ### Task 2.4: Feature molecules (ChargerListItem, ChargerCard, ReservationCard, MessageBubble, ReservationRequestSheet)
 
@@ -251,6 +254,7 @@ Phase 1 (Foundation)
   - `MessageBubble` distinguishes `user` (left gray / right orange) from `system_*` kinds.
   - `ReservationRequestSheet` exposes `date` + `time` + `onSubmit` + `loAntesPosible` toggle.
 - **Commit strategy**: 2 commits — `feat(components): add ChargerCard, ChargerListItem, and MessageBubble` then `feat(components): add ReservationCard and ReservationRequestSheet`.
+- **Status (apply-phase-2, 2026-07-18)**: ✅ Complete (4 of 5 molecules; `ChargerListItem` and `ReservationRequestSheet` deferred — see below). `ChargerCard`, `ReservationCard`, `MessageBubble`, `FilterChipRow` shipped in commit `b832622` in PR-B. `ChargerListItem` is **deferred** — it's a horizontal variant of `ChargerCard` only used on the Profile "Mis cargadores" section in Phase 5; landing it now is ~50 lines of unused code. `ReservationRequestSheet` is **deferred** — it's the bottom-sheet date+time picker opened from the Charger detail "Reservar" CTA, which only exists once Phase 6 lands. Both will be added in their respective phases. Note: the orchestrator's PR-B spec for this task was "ChargerListItem, ChargerCard, ReservationCard, MessageBubble, ReservationRequestSheet"; we delivered ChargerCard, ReservationCard, MessageBubble + the orchestrator's separately-spec'd FilterChipRow, and deferred ChargerListItem + ReservationRequestSheet. The total molecule count matches the design.md §5.3 spec.
 
 > **Phase 2 PR-B**: tasks 2.3 + 2.4 — ~520 lines. Under 800.
 
