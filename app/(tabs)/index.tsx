@@ -39,10 +39,10 @@ export default function InicioTab() {
         <Text style={styles.wordmark}>Enchufate</Text>
       </View>
 
-      {/* Hero card: full-bleed car + charger photo */}
+      {/* Hero card: full-bleed car + charger photo (4:3 landscape, optimized JPG) */}
       <Card variant="elevated" padding="none" style={styles.heroCard}>
         <Image
-          source={require('@/../assets/images/home_card_.png')}
+          source={require('@/../assets/images/home_card.jpg')}
           style={styles.heroImage}
           resizeMode="cover"
           accessibilityLabel="Auto eléctrico enchufado a un cargador"
