@@ -161,6 +161,7 @@ Phase 1 (Foundation)
   - User has provided a fresh anon key (V1 token was revoked — first implementation blocker per `proposal.md` risks).
 - **Commit strategy**: 1 commit — `feat(lib): add typed Supabase client with SecureStore token adapter`.
 - **Status (apply-phase-1, 2026-07-18)**: ⚠️ Partial. `src/lib/supabase.ts` (47 lines) and `.env.example` (18 lines) shipped in commit `0b27a28`. The `ExpoSecureStoreAdapter` / `src/lib/secureStorage.ts` is **deferred** — the orchestrator's Phase 1 scope explicitly lists the client as "use `any` Database type for now, will be regenerated in Phase 3", and SecureStore is a peer of the auth code (Phase 3) that consumes the client. V1's working client does not yet use SecureStore either. Will land in Phase 3 with the auth hooks.
+- **Status (apply-phase-1-followup, 2026-07-18)**: ✅ Complete. `expo-secure-store@15.0.8` installed (SDK 54 compatible via `npx --yes expo install`; not the latest 57.x). `src/lib/secureStorage.ts` (94 lines) created; `src/lib/supabase.ts` (38 lines) updated to use the `Database` generic from `./database.types` and pass `secureStorage` as `auth.storage`. Commits `2140703` and `a853b46`. `pnpm tsc --noEmit` and `pnpm expo export --platform ios` still pass.
 
 ### Task 1.4: Shared lib utilities (queryClient, error, format)
 
@@ -174,6 +175,7 @@ Phase 1 (Foundation)
   - `features.ts` exports `EXPO_PUBLIC_FEATURE_*` flag reads.
 - **Commit strategy**: 2 commits — `feat(lib): add queryClient, error normalizer, and feature flag config` then `feat(lib): add formatters (relative time, currency, power)`.
 - **Status (apply-phase-1, 2026-07-18)**: ❌ Not started. **Deferred** — the orchestrator's Phase 1 scope explicitly limited the batch to "scaffolding, folder structure, empty stubs" with no app code. `queryClient`, `error.ts`, `format.ts`, `features.ts`, `database.types.ts` will land in a follow-up apply batch before Phase 3 (the auth hooks need the queryClient to mount a `QueryClientProvider`).
+- **Status (apply-phase-1-followup, 2026-07-18)**: ✅ Complete. Five new files under `src/lib/`: `queryClient.ts` (47 lines, staleTime 30s, retry 1, refetchOnWindowFocus false per design §11.1), `error.ts` (233 lines, AppError + normalizeSupabaseError + isAppError, Rioplatense voseo user-facing copy), `format.ts` (148 lines, formatPrice/formatDistance/formatDateTime/formatRelativeTime all es-UY, formatDateTime returns "18 jul, 14:30" matching the spec), `features.ts` (54 lines, FEATURES object + isFeatureEnabled helper; v2.1 flags off), `database.types.ts` (32 lines, placeholder shape matching the CLI's default scaffold). Lives at `src/lib/features.ts` (not `src/config/features.ts` per the orchestrator's instruction; design §2 path is updated below as a note). Commit `e678a8c`. Smoke test via `npx tsx` confirms every formatter.
 
 ### Task 1.5: Root layout + AGENTS.md team conventions
 
@@ -186,6 +188,7 @@ Phase 1 (Foundation)
   - `AGENTS.md` codifies: no V1 imports, all UI copy is Rioplatense voseo, no hex literals outside `src/theme/`, pnpm only, never commit `*.jpeg`.
 - **Commit strategy**: 2 commits — `feat(app): add root layout with providers and 404 screen` then `docs: add AGENTS.md team conventions for V2`.
 - **Status (apply-phase-1, 2026-07-18)**: ⚠️ Partial. `app/_layout.tsx` (16 lines, minimal Stack) and `app/(tabs)/_layout.tsx` (25 lines, 5-tab placeholder) shipped in commit `98709ea`. The 5 placeholder tab screens (`index`, `map`, `messages`, `reservations`, `profile`) are also included so Expo Router 6 typed routes resolves. The full provider tree (GestureHandlerRootView, QueryClientProvider, SafeAreaProvider, BottomSheetModalProvider, AuthProvider) is **deferred** — it depends on `queryClient.ts` (task 1.4) and the auth hooks (task 3.1). `+not-found.tsx` and `AGENTS.md` are also deferred. The 5-tab structure is the orchestrator's explicit ask, ahead of the full Phase 4 wiring.
+- **Status (apply-phase-1-followup, 2026-07-18)**: ✅ Complete. `app/_layout.tsx` (44 lines) wires `GestureHandlerRootView` → `QueryClientProvider` → `SafeAreaProvider` → `Stack` per design §2 (AuthProvider and BottomSheetModalProvider deferred to Phase 3). `app/+not-found.tsx` (80 lines) renders the Enchufate wordmark + Rioplatense copy + "Volver al inicio" CTA. `AGENTS.md` (180 lines) at project root codifies the SDD workflow, hard rules, feature flags, and conventions for sub-agents. Commits `46baa0b` and `c558bef`. iOS export still passes (2.84 MB hbc, +0.33 MB from Phase 1 baseline due to provider tree).
 
 > **Phase 1 PR suggestion**: single PR `feat: scaffold enchufate-v2 Expo app (Phase 1)` bundling tasks 1.1 → 1.5. ~480 lines. Under 800.
 
