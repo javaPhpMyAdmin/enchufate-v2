@@ -473,6 +473,7 @@ Phase 1 (Foundation)
   - `useSendMessage` is optimistic: it inserts a pending message, rolls back on error, invalidates `['messages', convId]` on settled.
   - All hooks return typed `{ data, isLoading, error }` shapes.
 - **Commit strategy**: 2 commits — `feat(messaging): add useConversations and useMessages hooks` then `feat(messaging): add optimistic useSendMessage with rollback`.
+- **Status (apply-phase-5, 2026-07-19)**: ✅ Complete (mock data path; real Supabase swap lands in Phase 7). `src/features/messaging/types.ts` (84 lines, `Message` + `Conversation` interfaces mirroring the schema; `MessageKind` enum matches the `public.messages` enum; `otherParty()` helper for the list/thread screen to pick the right participant). `data/mockConversations.ts` (73 lines, 3 conversations with one unread). `data/mockMessages.ts` (71 lines, per-conversation message arrays covering `user` / `system_reservation_requested` / `system_reservation_confirmed` kinds in ascending order). `hooks/useConversations.ts` (54 lines, `staleTime: 15_000`, gated on `userId` AND `isFeatureEnabled('CHAT')`; returns empty array when the flag is off). `hooks/useMessages.ts` (57 lines, `staleTime: 0` so Realtime invalidations win in Phase 7, same CHAT flag gate). `hooks/useSendMessage.ts` (114 lines, optimistic `onMutate` inserts a `pending: true` message and snapshots the previous list; `onError` rolls back from the snapshot; `onSettled` invalidates `['messages', convId]`; `mutationFn` is a mock that resolves after 100ms with a synthetic `local-*` id — Phase 7 swaps it for the real `.from('messages').insert(...)` call). All errors wrapped via `normalizeSupabaseError` per AGENTS.md rule #3.
 
 ### Task 5.4: Mensajes list screen with search bar
 
@@ -484,6 +485,7 @@ Phase 1 (Foundation)
   - Each row shows avatar, display name, last message preview, relative timestamp.
   - Tapping a row navigates to `/messages/[id]` (the route is wired but the screen lands in 5.5).
 - **Commit strategy**: 1 commit — `feat(messaging): add Mensajes list with search and last-message preview`.
+- **Status (apply-phase-5, 2026-07-19)**: ✅ Complete. `app/(tabs)/messages.tsx` (~270 lines, replaces the 28-line Phase 4 stub). Branches on `useSession()`: LoadingState during hydration, EmptyState with "Inicia sesion" CTA when no session, full list when signed in. Authed state has a search bar ("Buscar conversaciones" placeholder) that filters by other-party name via the `otherParty()` helper, a `FlatList` of `ConversationRow`s (avatar + name + time + last-message preview + unread dot when `unread_count > 0`), and an empty state when the filtered list is empty (with different copy for "no conversations" vs "no results for {query}"). All errors wrapped via `<ErrorState />` with `userMessage`. Tapping a row pushes to `/messages/${id}`.
 
 ### Task 5.5: 1:1 thread screen `/messages/[id]`
 
@@ -496,6 +498,7 @@ Phase 1 (Foundation)
   - Input bar with "Escribí un mensaje" placeholder and a paper-plane send `Button`.
   - `MessageBubble` distinguishes user / system_* kinds per the messaging spec.
 - **Commit strategy**: 1 commit — `feat(messaging): add 1:1 thread screen with composer and infinite scroll`.
+- **Status (apply-phase-5, 2026-07-19)**: ✅ Complete. `app/messages/[id].tsx` (~310 lines, new route). Custom header (back arrow + other-party avatar + name + "Desconectado" status — built inline rather than via `Stack.Screen` so the avatar + status render as a single row). Inverted `FlatList` of `MessageBubble`s (data reversed in a `useMemo` so the most recent message renders at the bottom; the inverted layout means new messages auto-scroll to the bottom). Composer with a multi-line `TextInput` ("Escribí un mensaje" placeholder, max 500 chars) + a circular primary `Pressable` with the `Send` icon, disabled when the input is empty or a send is in flight. `useMessages` + `useSendMessage` wired in; the optimistic message renders with a "Enviando..." timestamp + a small `Clock` icon via the new `pending` prop on `MessageBubble`. The `MessageBubble` atom was extended with `isOwn?: boolean` and `pending?: boolean` props so the thread can render incoming (other-party) user messages on the left in gray, outgoing on the right in orange, and system messages consistently on the left in gray (the spec's right-aligned orange for `system_reservation_confirmed` / `system_reservation_cancelled` is deferred to Phase 7 when the real system-message-injector Edge Function lands — see deviation note in the apply-progress artifact).
 
 > **Phase 5 PR-B**: tasks 5.3 + 5.4 + 5.5. ~430 lines. Under 800.
 
