@@ -25,11 +25,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { Search, MessageCircle } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/atoms/Avatar';
+import { Button } from '@/components/atoms/Button';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { ErrorState } from '@/components/molecules/ErrorState';
 import { Icon } from '@/components/atoms/Icon';
@@ -53,7 +54,13 @@ export default function MessagesTab() {
   }
 
   if (!session) {
-    return <GuestState topInset={insets.top} onLoginPress={() => router.push('/login?returnTo=/messages' as never)} />;
+    return (
+      <GuestState
+        insetsTop={insets.top}
+        insetsBottom={insets.bottom}
+        onLoginPress={() => router.push('/login?returnTo=/messages' as never)}
+      />
+    );
   }
 
   return <AuthedList userId={userId ?? 'mock-uid'} topInset={insets.top} />;
@@ -64,21 +71,45 @@ export default function MessagesTab() {
 /* ------------------------------------------------------------------ */
 
 function GuestState({
-  topInset,
+  insetsTop,
+  insetsBottom,
   onLoginPress,
 }: {
-  topInset: number;
+  insetsTop: number;
+  insetsBottom: number;
   onLoginPress: () => void;
 }): React.JSX.Element {
+  const router = useRouter();
   return (
-    <View style={[styles.flex, { paddingTop: topInset }]}>
-      <EmptyState
-        icon={MessageCircle}
-        title="Necesitás iniciar sesión"
-        body="Iniciá sesión para ver tus conversaciones con anfitriones y huéspedes."
-        ctaLabel="Iniciá sesión"
-        onCtaPress={onLoginPress}
+    <View
+      style={[
+        styles.flex,
+        styles.guest,
+        { paddingTop: insetsTop + spacing.xl, paddingBottom: insetsBottom + spacing.xl },
+      ]}
+    >
+      <View style={styles.guestIcon}>
+        <Icon icon={MessageCircle} size="xl" color={colors.primary} />
+      </View>
+      <Text style={styles.guestTitle}>Necesitás iniciar sesión</Text>
+      <Text style={styles.guestBody}>
+        Iniciá sesión para ver tus conversaciones con anfitriones y huéspedes.
+      </Text>
+      <Button
+        label="Iniciá sesión"
+        variant="primary"
+        fullWidth
+        onPress={onLoginPress}
+        style={styles.guestCta}
       />
+      <View style={styles.signupRow}>
+        <Text style={styles.signupPrompt}>¿No tenés cuenta?</Text>
+        <Link href="/signup" asChild>
+          <Text style={styles.signupLink} accessibilityRole="link">
+            Creá tu cuenta
+          </Text>
+        </Link>
+      </View>
     </View>
   );
 }
@@ -261,6 +292,40 @@ function SearchBar({
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
+
+  /* Guest */
+  guest: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.base,
+  },
+  guestIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  guestTitle: { ...typography.title, color: colors.textPrimary, textAlign: 'center' },
+  guestBody: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    maxWidth: 320,
+  },
+  guestCta: { marginTop: spacing.base, alignSelf: 'stretch' },
+  signupRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  signupPrompt: { ...typography.caption, color: colors.textSecondary },
+  signupLink: { ...typography.caption, color: colors.primary, fontWeight: '600' },
 
   searchBar: {
     flexDirection: 'row',

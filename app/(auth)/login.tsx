@@ -191,8 +191,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   scroll: {
     flexGrow: 1,
-    paddingHorizontal: spacing.lg,
-    gap: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    gap: spacing.base,
   },
   brand: {
     flexDirection: 'row',

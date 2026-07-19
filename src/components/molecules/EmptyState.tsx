@@ -12,6 +12,9 @@ export interface EmptyStateProps {
   body?: string;
   ctaLabel?: string;
   onCtaPress?: () => void;
+  /** Optional "¿No tenés cuenta?" row below the CTA. */
+  signupLabel?: string;
+  onSignupPress?: () => void;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -31,6 +34,8 @@ export function EmptyState({
   body,
   ctaLabel,
   onCtaPress,
+  signupLabel,
+  onSignupPress,
   style,
 }: EmptyStateProps): React.JSX.Element {
   return (
@@ -46,7 +51,19 @@ export function EmptyState({
       {body ? <Text style={styles.body}>{body}</Text> : null}
       {ctaLabel && onCtaPress ? (
         <View style={styles.cta}>
-          <Button label={ctaLabel} onPress={onCtaPress} variant="primary" />
+          <Button label={ctaLabel} onPress={onCtaPress} variant="primary" fullWidth />
+        </View>
+      ) : null}
+      {signupLabel && onSignupPress ? (
+        <View style={styles.signupRow}>
+          <Text style={styles.signupPrompt}>{signupLabel}</Text>
+          <Text
+            style={styles.signupLink}
+            accessibilityRole="link"
+            onPress={onSignupPress}
+          >
+            Creá tu cuenta
+          </Text>
         </View>
       ) : null}
     </View>
@@ -87,4 +104,12 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     alignItems: 'center',
   },
+  signupRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.base,
+  },
+  signupPrompt: { ...typography.caption, color: colors.textSecondary },
+  signupLink: { ...typography.caption, color: colors.primary, fontWeight: '600' },
 });
