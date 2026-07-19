@@ -1,28 +1,293 @@
 /**
- * Mensajes tab — Phase 2 placeholder.
+ * Mensajes tab — Phase 5.
  *
- * The full Phase 5 screen renders a search bar + conversation list
- * (avatar, display name, last message preview, relative timestamp).
- * For now we render an EmptyState that prompts login; the CTA
- * navigates to `/login?returnTo=/messages` (login lands in
- * Phase 3, so the navigation will be a 404 until then).
+ * Two states:
+ *   - **Guest** (no session): illustrated empty state with
+ *     "Iniciá sesión" CTA. Same pattern as the other auth-gated
+ *     tabs (Phase 4).
+ *   - **Authenticated**: search bar ("Buscar conversaciones") +
+ *     scrollable list of conversations. Each row shows the other
+ *     party's avatar + name, the last message preview, the
+ *     relative time, and an unread dot if `unread_count > 0`.
+ *     Tapping a row navigates to `/messages/[id]` (the thread
+ *     screen, which lands in the same PR).
+ *
+ * The search bar filters by other-party display name per the
+ * messaging spec scenario. We do not filter on message body
+ * (the spec only requires name filtering).
  */
+import { useMemo, useState } from 'react';
+import {
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { MessageCircle } from 'lucide-react-native';
+import { Search, MessageCircle } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Avatar } from '@/components/atoms/Avatar';
 import { EmptyState } from '@/components/molecules/EmptyState';
+import { ErrorState } from '@/components/molecules/ErrorState';
+import { Icon } from '@/components/atoms/Icon';
+import { LoadingState } from '@/components/molecules/LoadingState';
+import { useSession } from '@/features/auth/hooks/useSession';
+import { useConversations } from '@/features/messaging/hooks/useConversations';
+import type { Conversation } from '@/features/messaging/types';
+import { otherParty } from '@/features/messaging/types';
+import { formatRelativeTime } from '@/lib/format';
+import { colors, radius, spacing, typography } from '@/theme';
 
 export default function MessagesTab() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { session, isLoading: sessionLoading } = useSession();
+  const userId = session?.user.id ?? null;
+
+  if (sessionLoading) {
+    return <LoadingState />;
+  }
+
+  if (!session) {
+    return <GuestState topInset={insets.top} onLoginPress={() => router.push('/login?returnTo=/messages' as never)} />;
+  }
+
+  return <AuthedList userId={userId ?? 'mock-uid'} topInset={insets.top} />;
+}
+
+/* ------------------------------------------------------------------ */
+/* Guest state                                                          */
+/* ------------------------------------------------------------------ */
+
+function GuestState({
+  topInset,
+  onLoginPress,
+}: {
+  topInset: number;
+  onLoginPress: () => void;
+}): React.JSX.Element {
   return (
-    <EmptyState
-      icon={MessageCircle}
-      title="Necesitás iniciar sesión"
-      body="Iniciá sesión para ver tus conversaciones con anfitriones y huéspedes."
-      ctaLabel="Iniciá sesión"
-      // Phase 3 (auth) owns the login route. Cast via `as never` so the
-      // typed-routes pass until Phase 3 lands.
-      onCtaPress={() => router.push('/login?returnTo=/messages' as never)}
-    />
+    <View style={[styles.flex, { paddingTop: topInset }]}>
+      <EmptyState
+        icon={MessageCircle}
+        title="Necesitás iniciar sesión"
+        body="Iniciá sesión para ver tus conversaciones con anfitriones y huéspedes."
+        ctaLabel="Iniciá sesión"
+        onCtaPress={onLoginPress}
+      />
+    </View>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* Authenticated list                                                   */
+/* ------------------------------------------------------------------ */
+
+function AuthedList({
+  userId,
+  topInset,
+}: {
+  userId: string;
+  topInset: number;
+}): React.JSX.Element {
+  const router = useRouter();
+  const conversations = useConversations(userId);
+  const [query, setQuery] = useState('');
+
+  const filtered = useMemo(() => {
+    const list = conversations.data ?? [];
+    const q = query.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((c) => {
+      const party = otherParty(c, userId);
+      return party.name.toLowerCase().includes(q);
+    });
+  }, [conversations.data, query, userId]);
+
+  if (conversations.isLoading) {
+    return <LoadingState />;
+  }
+
+  if (conversations.error) {
+    return (
+      <ErrorState
+        body={conversations.error.userMessage}
+        onRetry={() => conversations.refetch()}
+        retryLabel="Reintentar"
+      />
+    );
+  }
+
+  if (filtered.length === 0) {
+    return (
+      <View style={[styles.flex, { paddingTop: topInset }]}>
+        <SearchBar value={query} onChangeText={setQuery} />
+        <EmptyState
+          icon={MessageCircle}
+          title={query ? 'Sin resultados' : 'Todavía no tenés conversaciones'}
+          body={
+            query
+              ? `No encontramos conversaciones con "${query}".`
+              : 'Cuando reserves un cargador o un huésped te escriba, la conversación aparece acá.'
+          }
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.flex, { paddingTop: topInset }]}>
+      <SearchBar value={query} onChangeText={setQuery} />
+      <FlatList
+        data={filtered}
+        keyExtractor={(c) => c.id}
+        renderItem={({ item }) => (
+          <ConversationRow
+            conversation={item}
+            currentUserId={userId}
+            onPress={() => router.push(`/messages/${item.id}` as never)}
+          />
+        )}
+        contentContainerStyle={styles.list}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        keyboardShouldPersistTaps="handled"
+      />
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Conversation row                                                     */
+/* ------------------------------------------------------------------ */
+
+function ConversationRow({
+  conversation,
+  currentUserId,
+  onPress,
+}: {
+  conversation: Conversation;
+  currentUserId: string;
+  onPress: () => void;
+}): React.JSX.Element {
+  const party = otherParty(conversation, currentUserId);
+  const preview = conversation.last_message_body;
+  const time = formatRelativeTime(conversation.last_message_at);
+  const unread = conversation.unread_count > 0;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Conversación con ${party.name}`}
+      style={({ pressed }) => [styles.row, pressed ? styles.rowPressed : null]}
+    >
+      <Avatar uri={party.avatarUrl} name={party.name} size="md" />
+      <View style={styles.rowText}>
+        <View style={styles.rowHeader}>
+          <Text style={styles.rowName} numberOfLines={1}>
+            {party.name}
+          </Text>
+          <Text style={styles.rowTime}>{time}</Text>
+        </View>
+        <View style={styles.rowSubheader}>
+          <Text
+            style={[
+              styles.rowPreview,
+              unread ? styles.rowPreviewUnread : null,
+            ]}
+            numberOfLines={1}
+          >
+            {preview}
+          </Text>
+          {unread ? <View style={styles.unreadDot} accessibilityLabel="Mensaje no leído" /> : null}
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Search bar                                                           */
+/* ------------------------------------------------------------------ */
+
+function SearchBar({
+  value,
+  onChangeText,
+}: {
+  value: string;
+  onChangeText: (next: string) => void;
+}): React.JSX.Element {
+  return (
+    <View style={styles.searchBar}>
+      <Icon icon={Search} size="sm" color={colors.textSecondary} />
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder="Buscar conversaciones"
+        placeholderTextColor={colors.textSecondary}
+        style={styles.searchInput}
+        autoCorrect={false}
+        autoCapitalize="none"
+        returnKeyType="search"
+      />
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Styles                                                               */
+/* ------------------------------------------------------------------ */
+
+const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: colors.background },
+
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.input,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginHorizontal: spacing.base,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    ...typography.body,
+    color: colors.textPrimary,
+    paddingVertical: 0,
+  },
+
+  list: { paddingVertical: spacing.sm },
+  separator: { height: 1, backgroundColor: colors.border, marginHorizontal: spacing.base },
+
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+  },
+  rowPressed: { opacity: 0.92 },
+  rowText: { flex: 1, gap: 2 },
+  rowHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  rowName: { ...typography.heading, color: colors.textPrimary, flex: 1 },
+  rowTime: { ...typography.caption, color: colors.textSecondary, marginLeft: spacing.sm },
+  rowSubheader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  rowPreview: { ...typography.caption, color: colors.textSecondary, flex: 1 },
+  rowPreviewUnread: { color: colors.textPrimary, fontWeight: '600' },
+  unreadDot: {
+    width: 10,
+    height: 10,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+  },
+});
