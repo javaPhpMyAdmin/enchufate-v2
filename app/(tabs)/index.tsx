@@ -49,26 +49,42 @@ export default function InicioTab() {
         />
       </Card>
 
-      {/* CTA card 1: TEST orange */}
+      {/* CTA card 1: Buscar un cargador (white) */}
       <Card
         variant="default"
         padding="lg"
         onPress={() => router.push('/(tabs)/map')}
         accessibilityLabel="Buscar un cargador"
-        style={styles.ctaCardTestOrange}
+        style={styles.ctaCard}
       >
-        <Text style={styles.ctaTitlePrimary}>TEST ORANGE 1</Text>
+        <View style={styles.ctaRow}>
+          <View style={[styles.iconCircle, styles.iconCircleBuscar]}>
+            <Search size={32} color={colors.primary} strokeWidth={2} />
+          </View>
+          <View style={styles.ctaText}>
+            <Text style={styles.ctaTitle}>Buscar un cargador</Text>
+            <Text style={styles.ctaSubtitle}>Encontrá estaciones cerca de ti</Text>
+          </View>
+        </View>
       </Card>
 
-      {/* CTA card 2: TEST orange */}
+      {/* CTA card 2: Publicar mi cargador (primary orange fill) */}
       <Card
         variant="default"
         padding="lg"
         onPress={() => router.push('/publish/1-name' as never)}
         accessibilityLabel="Publicar mi cargador"
-        style={styles.ctaCardTestOrange}
+        style={styles.ctaCardPrimary}
       >
-        <Text style={styles.ctaTitlePrimary}>TEST ORANGE 2</Text>
+        <View style={styles.ctaRow}>
+          <View style={[styles.iconCircle, styles.iconCirclePublicar]}>
+            <MapPin size={32} color={colors.primary} strokeWidth={2} />
+          </View>
+          <View style={styles.ctaText}>
+            <Text style={styles.ctaTitlePrimary}>Publicar mi cargador</Text>
+            <Text style={styles.ctaSubtitlePrimary}>Ganá dinero compartiendo tu punto</Text>
+          </View>
+        </View>
       </Card>
     </ScrollView>
   );
@@ -116,23 +132,18 @@ const styles = StyleSheet.create({
 
   // CTA cards (shared) — bumped up for more screen presence
   ctaCard: {
-    marginTop: spacing.sm,
-    minHeight: 88,
+    marginTop: spacing.base,
+    minHeight: 110,
   },
   ctaCardPrimary: {
-    marginTop: spacing.sm,
-    minHeight: 88,
+    marginTop: spacing.base,
+    minHeight: 110,
     backgroundColor: colors.primary,
   },
-  ctaCardTestOrange: {
-    marginTop: spacing.sm,
-    minHeight: 88,
-    backgroundColor: colors.primary,
-  },
-  ctaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.base },
+  ctaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   iconCircle: {
-    width: 56,
-    height: 56,
+    width: 72,
+    height: 72,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
@@ -142,14 +153,14 @@ const styles = StyleSheet.create({
   ctaText: { flex: 1 },
 
   // CTA text variants
-  ctaTitle: { ...typography.title, color: colors.textPrimary, fontSize: 18 },
-  ctaSubtitle: { ...typography.body, color: colors.textSecondary, marginTop: 3, fontSize: 14 },
-  ctaTitlePrimary: { ...typography.title, color: colors.textOnPrimary, fontSize: 18 },
+  ctaTitle: { ...typography.title, color: colors.textPrimary, fontSize: 20, fontWeight: '700' },
+  ctaSubtitle: { ...typography.body, color: colors.textSecondary, marginTop: 4, fontSize: 15 },
+  ctaTitlePrimary: { ...typography.title, color: colors.textOnPrimary, fontSize: 20, fontWeight: '700' },
   ctaSubtitlePrimary: {
     ...typography.body,
     color: colors.textOnPrimary,
     opacity: 0.9,
-    marginTop: 3,
-    fontSize: 14,
+    marginTop: 4,
+    fontSize: 15,
   },
 });
