@@ -5,7 +5,9 @@ import {
   Text,
   TextInput,
   View,
+  type KeyboardTypeOptions,
   type StyleProp,
+  type TextInputProps,
   type ViewStyle,
 } from 'react-native';
 
@@ -28,6 +30,14 @@ export interface InputProps {
   rightAdornment?: React.ReactNode;
   secureTextEntry?: boolean;
   disabled?: boolean;
+  editable?: boolean;
+  keyboardType?: KeyboardTypeOptions;
+  autoCapitalize?: TextInputProps['autoCapitalize'];
+  autoCorrect?: boolean;
+  autoComplete?: TextInputProps['autoComplete'];
+  textContentType?: TextInputProps['textContentType'];
+  returnKeyType?: TextInputProps['returnKeyType'];
+  onSubmitEditing?: TextInputProps['onSubmitEditing'];
   style?: StyleProp<ViewStyle>;
 }
 
@@ -43,6 +53,14 @@ export function Input({
   rightAdornment,
   secureTextEntry = false,
   disabled = false,
+  editable = true,
+  keyboardType,
+  autoCapitalize,
+  autoCorrect,
+  autoComplete,
+  textContentType,
+  returnKeyType,
+  onSubmitEditing,
   style,
 }: InputProps): React.JSX.Element {
   const [hidden, setHidden] = useState(secureTextEntry);
@@ -72,8 +90,15 @@ export function Input({
           onChangeText={onChangeText}
           placeholder={placeholder}
           placeholderTextColor={colors.textSecondary}
-          editable={!disabled}
+          editable={!disabled && editable}
           secureTextEntry={hidden}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          autoCorrect={autoCorrect}
+          autoComplete={autoComplete}
+          textContentType={textContentType}
+          returnKeyType={returnKeyType}
+          onSubmitEditing={onSubmitEditing}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={[styles.input, typography.body, { color: colors.textPrimary }]}
