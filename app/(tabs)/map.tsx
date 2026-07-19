@@ -35,6 +35,7 @@ import {
 } from '@maplibre/maplibre-react-native';
 import type { Feature, FeatureCollection, Point } from 'geojson';
 import { SlidersHorizontal } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import type { NativeSyntheticEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -101,6 +102,7 @@ export default function MapTab() {
   const cameraRef = useRef<CameraRef>(null);
   const sourceRef = useRef<GeoJSONSourceRef>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const router = useRouter();
 
   // Request location permission on first mount (Phase 4 spec).
   // A denied permission is non-fatal — the FAB falls back to Uruguay.
@@ -147,13 +149,10 @@ export default function MapTab() {
         return;
       }
       if (props.id) {
-        // Phase 6 will navigate to /charger/[id]. For now, log to console
-        // so QA can verify the tap handler fires.
-        // eslint-disable-next-line no-console
-        console.log(`[Mapa] charger tapped: ${props.id} (${props.title ?? ''})`);
+        router.push(`/charger/${props.id}` as never);
       }
     },
-    [],
+    [router],
   );
 
   if (isLoading) {
