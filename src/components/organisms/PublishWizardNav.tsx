@@ -8,28 +8,30 @@
  * **Validation**: the Siguiente CTA stays disabled until the current
  * step's `validateStepN` returns `valid: true`. The validator
  * dispatcher below is the single source of truth for "which step
- * is valid" — PR-D's commit 1 wires steps 5 and 6; commit 2 wires
- * step 7 + the usePublishCharger mutation that replaces `nextStep()`
- * for the final "Publicar" press.
+ * is valid" — all 7 validators are in place.
  *
- * **Navigation**: both buttons call the store's `nextStep()` /
- * `prevStep()` actions, which mutate `step`. The publish layout
- * (see `app/publish/_layout.tsx`) watches `step` and routes the
- * user to the matching `/publish/N-{name}` screen. The layout
- * also handles the auth gate, so this component stays purely
+ * **Navigation**: steps 1–6 call `nextStep()` / `prevStep()`,
+ * which mutate `step`. The publish layout (see
+ * `app/publish/_layout.tsx`) watches `step` and routes the user to
+ * the matching `/publish/N-{name}` screen. The layout also
+ * handles the auth gate, so this component stays purely
  * presentational.
  *
- * **"Publicar" label**: at step 7 the Siguiente button reads
- * "Publicar" instead. PR-D commit 2 swaps the `onPress` from
- * `nextStep()` to `usePublishCharger().publish()` so a real
- * mutation runs; until then the button is visually labelled
- * "Publicar" but still routes to the next step on press.
+ * **"Publicar" + mutation on step 7**: at step 7 the primary
+ * button reads "Publicar" and on press calls
+ * `usePublishCharger().publish()` instead of `nextStep()`. While
+ * the mutation is in flight the button shows a loading spinner
+ * and stays disabled. On success the mutation navigates to
+ * `/publish/success` (handled inside the hook via
+ * `router.replace`); on error the typed `AppError` is exposed
+ * via `error.userMessage` for the step 7 screen to surface.
  */
-import React from 'react';
+import React, { useCallback } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/atoms/Button';
+import { usePublishCharger } from '@/features/chargers/hooks/usePublishCharger';
 import type { ChargerSchedule } from '@/features/chargers/types';
 import { colors, radius, spacing, typography } from '@/theme';
 
@@ -108,6 +110,8 @@ export function PublishWizardNav(): React.JSX.Element {
   const nextStep = usePublishStore((s) => s.nextStep);
   const prevStep = usePublishStore((s) => s.prevStep);
 
+  const { publish, isPending } = usePublishCharger();
+
   const canAdvance = validateCurrentStep(step, {
     name,
     description,
@@ -122,6 +126,19 @@ export function PublishWizardNav(): React.JSX.Element {
   const isFirstStep = step === 1;
   const isFinalStep = step === 7;
   const ctaLabel = isFinalStep ? 'Publicar' : 'Siguiente';
+
+  const onPrimaryPress = useCallback(() => {
+    if (isFinalStep) {
+      // `publish` is fire-and-forget here: the mutation handles
+      // navigation to /publish/success on success and surfaces the
+      // typed AppError via `error.userMessage` for the screen to
+      // render. We intentionally don't await — the user is already
+      // staring at a loading spinner on the CTA.
+      void publish();
+      return;
+    }
+    nextStep();
+  }, [isFinalStep, publish, nextStep]);
 
   return (
     <View style={[styles.wrap, { paddingBottom: insets.bottom + spacing.sm }]}>
@@ -153,8 +170,9 @@ export function PublishWizardNav(): React.JSX.Element {
         <Button
           label={ctaLabel}
           variant="primary"
-          onPress={nextStep}
+          onPress={onPrimaryPress}
           disabled={!canAdvance}
+          loading={isFinalStep && isPending}
           style={styles.flex}
         />
       </View>
