@@ -111,12 +111,12 @@ const styles = StyleSheet.create({
   },
   wordmark: { ...typography.display, color: colors.primary, fontSize: 28 },
 
-  // Hero card — locked to 16:9 with absoluteFill image so the card
-  // itself (not just the child) enforces the aspect ratio. Background
-  // uses a neutral tone so the contain-mode letterbox blends in.
+  // Hero card — taller than 16:9 to give the photo more screen presence.
+  // The image is 16:9 (1.79) and the card is 4:3 (1.33), so cover
+  // will crop a bit of top/bottom but the subject stays centered.
   heroCard: {
     marginBottom: spacing.xs,
-    aspectRatio: 16 / 9,
+    aspectRatio: 4 / 3,
     overflow: 'hidden',
     backgroundColor: colors.background,
   },
