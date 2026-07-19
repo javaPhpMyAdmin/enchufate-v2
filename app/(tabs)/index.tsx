@@ -49,42 +49,26 @@ export default function InicioTab() {
         />
       </Card>
 
-      {/* CTA card 1: Buscar un cargador (white) */}
+      {/* CTA card 1: TEST orange */}
       <Card
         variant="default"
         padding="lg"
         onPress={() => router.push('/(tabs)/map')}
         accessibilityLabel="Buscar un cargador"
-        style={styles.ctaCard}
+        style={styles.ctaCardTestOrange}
       >
-        <View style={styles.ctaRow}>
-          <View style={[styles.iconCircle, styles.iconCircleBuscar]}>
-            <Search size={26} color={colors.primary} strokeWidth={2} />
-          </View>
-          <View style={styles.ctaText}>
-            <Text style={styles.ctaTitle}>Buscar un cargador</Text>
-            <Text style={styles.ctaSubtitle}>Encontrá estaciones cerca de ti</Text>
-          </View>
-        </View>
+        <Text style={styles.ctaTitlePrimary}>TEST ORANGE 1</Text>
       </Card>
 
-      {/* CTA card 2: Publicar mi cargador (primary orange fill) */}
+      {/* CTA card 2: TEST orange */}
       <Card
         variant="default"
         padding="lg"
         onPress={() => router.push('/publish/1-name' as never)}
         accessibilityLabel="Publicar mi cargador"
-        style={styles.ctaCardPrimary}
+        style={styles.ctaCardTestOrange}
       >
-        <View style={styles.ctaRow}>
-          <View style={[styles.iconCircle, styles.iconCirclePublicar]}>
-            <MapPin size={26} color={colors.primary} strokeWidth={2} />
-          </View>
-          <View style={styles.ctaText}>
-            <Text style={styles.ctaTitlePrimary}>Publicar mi cargador</Text>
-            <Text style={styles.ctaSubtitlePrimary}>Ganá dinero compartiendo tu punto</Text>
-          </View>
-        </View>
+        <Text style={styles.ctaTitlePrimary}>TEST ORANGE 2</Text>
       </Card>
     </ScrollView>
   );
@@ -136,6 +120,11 @@ const styles = StyleSheet.create({
     minHeight: 88,
   },
   ctaCardPrimary: {
+    marginTop: spacing.sm,
+    minHeight: 88,
+    backgroundColor: colors.primary,
+  },
+  ctaCardTestOrange: {
     marginTop: spacing.sm,
     minHeight: 88,
     backgroundColor: colors.primary,
