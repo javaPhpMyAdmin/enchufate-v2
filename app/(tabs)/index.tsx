@@ -39,11 +39,14 @@ export default function InicioTab() {
         <Text style={styles.wordmark}>Enchufate</Text>
       </View>
 
-      {/* Hero card: solid orange background (test) */}
-      <Card variant="elevated" padding="none" style={styles.heroCardSolid}>
-        <View style={styles.heroSolidInner}>
-          <Text style={styles.heroSolidText}>Cargador EV</Text>
-        </View>
+      {/* Hero card: full-bleed car + charger photo (16:9 landscape) */}
+      <Card variant="elevated" padding="none" style={styles.heroCard}>
+        <Image
+          source={require('@/../assets/images/home_hero_v2.jpg')}
+          style={styles.heroImage}
+          resizeMode="cover"
+          accessibilityLabel="Auto eléctrico enchufado a un cargador"
+        />
       </Card>
 
       {/* CTA card 1: Buscar un cargador (white) */}
@@ -111,15 +114,6 @@ const styles = StyleSheet.create({
   // Hero card
   heroCard: { overflow: 'hidden', marginBottom: spacing.xs },
   heroImage: { width: '100%', aspectRatio: 16 / 9, backgroundColor: colors.border },
-  heroCardSolid: {
-    marginBottom: spacing.xs,
-    backgroundColor: colors.primary,
-    aspectRatio: 16 / 9,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  heroSolidInner: { padding: spacing.base },
-  heroSolidText: { ...typography.title, color: colors.textOnPrimary },
 
   // CTA cards (shared)
   ctaCard: { marginTop: spacing.xs },
