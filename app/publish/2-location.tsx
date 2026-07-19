@@ -30,6 +30,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -42,6 +43,7 @@ import { MapPin } from 'lucide-react-native';
 import { Card } from '@/components/atoms/Card';
 import { Icon } from '@/components/atoms/Icon';
 import { Input } from '@/components/atoms/Input';
+import { PermissionToast } from '@/components/molecules/PermissionToast';
 import {
   getCurrentPosition,
   requestLocationPermission,
@@ -79,6 +81,7 @@ export default function PublishStep2Location(): React.JSX.Element {
   const setLocation = usePublishStore((s) => s.setLocation);
 
   const [permission, setPermission] = useState<PermissionState>('loading');
+  const [showDeniedToast, setShowDeniedToast] = useState(false);
 
   // ----- Permission + position on mount -----
   useEffect(() => {
@@ -88,6 +91,7 @@ export default function PublishStep2Location(): React.JSX.Element {
       if (!mounted) return;
       if (result !== 'granted') {
         setPermission('denied');
+        setShowDeniedToast(true);
         return;
       }
       const pos = await getCurrentPosition();
@@ -102,6 +106,7 @@ export default function PublishStep2Location(): React.JSX.Element {
         setPermission('granted');
       } else {
         setPermission('denied');
+        setShowDeniedToast(true);
       }
     })();
     return () => {
@@ -185,45 +190,58 @@ export default function PublishStep2Location(): React.JSX.Element {
 
   // ----- Denied / undetermined branch — manual entry only -----
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.lg }]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+    <View style={styles.flex}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>Escribí la dirección manualmente</Text>
-          <Text style={styles.subtitle}>
-            Si no nos das permiso de ubicación, podés cargar la dirección a mano.
-          </Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.lg }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <Text style={styles.title}>Escribí la dirección manualmente</Text>
+            <Text style={styles.subtitle}>
+              Si no nos das permiso de ubicación, podés cargar la dirección a mano.
+            </Text>
+          </View>
 
-        <View style={styles.field}>
-          <Input
-            label="Dirección"
-            value={location?.address ?? ''}
-            onChangeText={onAddressChange}
-            placeholder="Calle, número, ciudad"
-            autoCapitalize="words"
-          />
-          <Text style={styles.helper}>
-            Tus huéspedes van a encontrar el cargador por esta dirección.
-          </Text>
-        </View>
+          <View style={styles.field}>
+            <Input
+              label="Dirección"
+              value={location?.address ?? ''}
+              onChangeText={onAddressChange}
+              placeholder="Calle, número, ciudad"
+              autoCapitalize="words"
+            />
+            <Text style={styles.helper}>
+              Tus huéspedes van a encontrar el cargador por esta dirección.
+            </Text>
+          </View>
 
-        {location?.lat !== null && location?.lng !== null ? (
-          // If a previous session saved a GPS-tagged location and the
-          // user is now denying, give them a way to clear it. The
-          // manual entry branch assumes lat/lng are null.
-          <Text style={styles.clearLink} onPress={onClearLocation}>
-            Quitar la ubicación detectada
-          </Text>
-        ) : null}
-      </ScrollView>
-    </KeyboardAvoidingView>
+          {location?.lat !== null && location?.lng !== null ? (
+            // If a previous session saved a GPS-tagged location and the
+            // user is now denying, give them a way to clear it. The
+            // manual entry branch assumes lat/lng are null.
+            <Text style={styles.clearLink} onPress={onClearLocation}>
+              Quitar la ubicación detectada
+            </Text>
+          ) : null}
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      <PermissionToast
+        visible={showDeniedToast}
+        onDismiss={() => setShowDeniedToast(false)}
+        message="Sin permiso de ubicación vamos a mostrar solo la dirección que escribas."
+        ctaLabel="Activar"
+        onCtaPress={() => {
+          setShowDeniedToast(false);
+          void Linking.openSettings();
+        }}
+      />
+    </View>
   );
 }
 
