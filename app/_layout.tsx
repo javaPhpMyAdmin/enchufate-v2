@@ -24,16 +24,29 @@
  *   7. `Stack` — Expo Router's navigator. The Stack auto-discovers
  *      every file under `app/` (the 5-tab `(tabs)` group is wired in
  *      `app/(tabs)/_layout.tsx`; the auth flow is in `app/(auth)/`).
+ *
+ * **Boot side effects** (Phase 8 polish, runs once on mount):
+ *   - **Asset preloading** — `home_card.png` (Inicio hero) and
+ *     `cargador.png` (map pin) are downloaded into the Expo asset
+ *     cache so first paint of the Inicio + Mapa screens skips the
+ *     decode round-trip. Idempotent on warm boots.
+ *   - **Feature flag log** — dumps the current `FEATURES` map to the
+ *     console so a developer can confirm the right flags are on for
+ *     the build. The actual gating happens in each feature hook
+ *     (`isFeatureEnabled('CHAT')` etc.) per the no-React-Context rule.
  */
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { Asset } from 'expo-asset';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ErrorBoundary } from '@/components/molecules/ErrorBoundary';
 import { useSession } from '@/features/auth/hooks/useSession';
+import { FEATURES, isFeatureEnabled } from '@/lib/features';
 import { queryClient } from '@/lib/queryClient';
 
 export default function RootLayout() {
@@ -41,6 +54,43 @@ export default function RootLayout() {
   // hydrates the auth store). The returned state is consumed by
   // individual screens, not the layout.
   useSession();
+
+  // ----- Boot side effects (Phase 8 polish) -----
+  useEffect(() => {
+    let cancelled = false;
+
+    // 1. Asset preloading — home hero + map pin. Best-effort; the
+    //    screens still render via `require()` if the cache write
+    //    fails (e.g. on a flaky network at first boot).
+    void Promise.all([
+      Asset.fromModule(require('@/../assets/images/home_card.png')).downloadAsync(),
+      Asset.fromModule(require('@/../assets/icons/cargador.png')).downloadAsync(),
+    ]).catch((err: unknown) => {
+      // eslint-disable-next-line no-console
+      console.warn('[boot] asset preload failed', err);
+    });
+
+    // 2. Feature flag log — surfaces the active feature set to the
+    //    dev console. The real gating is in each feature hook; this
+    //    is purely for visibility at boot. Wired at the provider
+    //    tree (this layout) per the Phase 3 follow-up.
+    if (!cancelled) {
+      // eslint-disable-next-line no-console
+      console.info(
+        '[boot] feature flags',
+        Object.fromEntries(
+          (Object.keys(FEATURES) as Array<keyof typeof FEATURES>).map((k) => [
+            k,
+            isFeatureEnabled(k),
+          ]),
+        ),
+      );
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
