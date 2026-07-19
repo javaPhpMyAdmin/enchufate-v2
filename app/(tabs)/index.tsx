@@ -59,7 +59,7 @@ export default function InicioTab() {
       >
         <View style={styles.ctaRow}>
           <View style={[styles.iconCircle, styles.iconCircleBuscar]}>
-            <Search size={22} color={colors.primary} strokeWidth={2} />
+            <Search size={26} color={colors.primary} strokeWidth={2} />
           </View>
           <View style={styles.ctaText}>
             <Text style={styles.ctaTitle}>Buscar un cargador</Text>
@@ -78,7 +78,7 @@ export default function InicioTab() {
       >
         <View style={styles.ctaRow}>
           <View style={[styles.iconCircle, styles.iconCirclePublicar]}>
-            <MapPin size={22} color={colors.primary} strokeWidth={2} />
+            <MapPin size={26} color={colors.primary} strokeWidth={2} />
           </View>
           <View style={styles.ctaText}>
             <Text style={styles.ctaTitlePrimary}>Publicar mi cargador</Text>
@@ -130,13 +130,20 @@ const styles = StyleSheet.create({
   heroSolidInner: { padding: spacing.base },
   heroSolidText: { ...typography.title, color: colors.textOnPrimary, fontSize: 24 },
 
-  // CTA cards (shared)
-  ctaCard: { marginTop: spacing.xs },
-  ctaCardPrimary: { marginTop: spacing.xs, backgroundColor: colors.primary },
+  // CTA cards (shared) — bumped up for more screen presence
+  ctaCard: {
+    marginTop: spacing.sm,
+    minHeight: 88,
+  },
+  ctaCardPrimary: {
+    marginTop: spacing.sm,
+    minHeight: 88,
+    backgroundColor: colors.primary,
+  },
   ctaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.base },
   iconCircle: {
-    width: 48,
-    height: 48,
+    width: 56,
+    height: 56,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
@@ -146,13 +153,14 @@ const styles = StyleSheet.create({
   ctaText: { flex: 1 },
 
   // CTA text variants
-  ctaTitle: { ...typography.title, color: colors.textPrimary },
-  ctaSubtitle: { ...typography.body, color: colors.textSecondary, marginTop: 2 },
-  ctaTitlePrimary: { ...typography.title, color: colors.textOnPrimary },
+  ctaTitle: { ...typography.title, color: colors.textPrimary, fontSize: 18 },
+  ctaSubtitle: { ...typography.body, color: colors.textSecondary, marginTop: 3, fontSize: 14 },
+  ctaTitlePrimary: { ...typography.title, color: colors.textOnPrimary, fontSize: 18 },
   ctaSubtitlePrimary: {
     ...typography.body,
     color: colors.textOnPrimary,
     opacity: 0.9,
-    marginTop: 2,
+    marginTop: 3,
+    fontSize: 14,
   },
 });
