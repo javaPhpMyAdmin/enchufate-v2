@@ -43,7 +43,7 @@ export default function InicioTab() {
       <Card variant="elevated" padding="none" style={styles.heroCard}>
         <Image
           source={require('@/../assets/images/home_card.png')}
-          style={styles.heroImage}
+          style={StyleSheet.absoluteFill}
           resizeMode="cover"
           accessibilityLabel="Auto eléctrico enchufado a un cargador"
         />
@@ -111,9 +111,13 @@ const styles = StyleSheet.create({
   },
   wordmark: { ...typography.display, color: colors.primary, fontSize: 28 },
 
-  // Hero card
-  heroCard: { overflow: 'hidden', marginBottom: spacing.xs },
-  heroImage: { width: '100%', aspectRatio: 16 / 9, backgroundColor: colors.border },
+  // Hero card — locked to 16:9 with absoluteFill image so the card
+  // itself (not just the child) enforces the aspect ratio.
+  heroCard: {
+    marginBottom: spacing.xs,
+    aspectRatio: 16 / 9,
+    overflow: 'hidden',
+  },
   heroCardSolid: {
     marginBottom: spacing.xs,
     backgroundColor: colors.primary,
