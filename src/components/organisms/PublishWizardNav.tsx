@@ -8,8 +8,9 @@
  * **Validation**: the Siguiente CTA stays disabled until the current
  * step's `validateStepN` returns `valid: true`. The validator
  * dispatcher below is the single source of truth for "which step
- * is valid" — PR-C adds steps 3 and 4; PR-D adds validators 5–7
- * as those steps land.
+ * is valid" — PR-D's commit 1 wires steps 5 and 6; commit 2 wires
+ * step 7 + the usePublishCharger mutation that replaces `nextStep()`
+ * for the final "Publicar" press.
  *
  * **Navigation**: both buttons call the store's `nextStep()` /
  * `prevStep()` actions, which mutate `step`. The publish layout
@@ -19,15 +20,17 @@
  * presentational.
  *
  * **"Publicar" label**: at step 7 the Siguiente button reads
- * "Publicar" instead. The actual submit lives behind
- * `usePublishCharger` (PR-D) — PR-B just lays the label down so
- * the visual contract is consistent across PRs.
+ * "Publicar" instead. PR-D commit 2 swaps the `onPress` from
+ * `nextStep()` to `usePublishCharger().publish()` so a real
+ * mutation runs; until then the button is visually labelled
+ * "Publicar" but still routes to the next step on press.
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/atoms/Button';
+import type { ChargerSchedule } from '@/features/chargers/types';
 import { colors, radius, spacing, typography } from '@/theme';
 
 import {
@@ -36,28 +39,40 @@ import {
   validateStep2,
   validateStep3,
   validateStep4,
+  validateStep5,
+  validateStep6,
+  validateStep7,
   type PublishStep,
+  type PublishConnectorType,
+  type PublishLocation,
+  type PublishPricing,
 } from '@/stores/publishStore';
 
 const TOTAL_STEPS = 7;
 
 /**
- * Dispatches to the right `validateStepN` for the current step.
- * Steps 5–7 don't have a PR-C validator yet; we return `valid: false`
- * so the Siguiente stays disabled. PR-D adds validators 5–7 as
- * those steps land.
+ * The state slice consumed by `validateCurrentStep`. Mirrors the
+ * relevant fields of `PublishStoreState` so the validators get the
+ * exact shapes they expect (without `as never` casts).
  */
-function validateCurrentStep(
-  step: PublishStep,
-  state: {
-    name: string;
-    description: string;
-    location: { lat: number | null; lng: number | null; address: string } | null;
-    connector_type: 'tipo_1' | 'tipo_2' | 'ccs' | 'chademo' | 'tesla' | null;
-    power_kw: number | null;
-    photos: string[];
-  },
-): boolean {
+interface NavStateSlice {
+  name: string;
+  description: string;
+  location: PublishLocation | null;
+  connector_type: PublishConnectorType | null;
+  power_kw: number | null;
+  photos: string[];
+  pricing: PublishPricing;
+  schedule: ChargerSchedule;
+  rules: string;
+}
+
+/**
+ * Dispatches to the right `validateStepN` for the current step.
+ * All 7 validators are in place; PR-D's commit 1 added 5 and 6,
+ * commit 2 will wire the final publish on step 7.
+ */
+function validateCurrentStep(step: PublishStep, state: NavStateSlice): boolean {
   switch (step) {
     case 1:
       return validateStep1(state).valid;
@@ -67,9 +82,13 @@ function validateCurrentStep(
       return validateStep3(state).valid;
     case 4:
       return validateStep4(state).valid;
+    case 5:
+      return validateStep5(state).valid;
+    case 6:
+      return validateStep6(state).valid;
+    case 7:
+      return validateStep7(state).valid;
     default:
-      // No validator yet — keep the CTA disabled to prevent advancing
-      // into a step that doesn't exist in this PR.
       return false;
   }
 }
@@ -83,6 +102,9 @@ export function PublishWizardNav(): React.JSX.Element {
   const connector_type = usePublishStore((s) => s.connector_type);
   const power_kw = usePublishStore((s) => s.power_kw);
   const photos = usePublishStore((s) => s.photos);
+  const pricing = usePublishStore((s) => s.pricing);
+  const schedule = usePublishStore((s) => s.schedule);
+  const rules = usePublishStore((s) => s.rules);
   const nextStep = usePublishStore((s) => s.nextStep);
   const prevStep = usePublishStore((s) => s.prevStep);
 
@@ -93,6 +115,9 @@ export function PublishWizardNav(): React.JSX.Element {
     connector_type,
     power_kw,
     photos,
+    pricing,
+    schedule,
+    rules,
   });
   const isFirstStep = step === 1;
   const isFinalStep = step === 7;
