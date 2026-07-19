@@ -510,6 +510,7 @@ Phase 1 (Foundation)
   - Both return `{ data, isLoading, error }` with `staleTime: 15_000`.
   - **Mutations are NOT in this task** (they land in Phase 7).
 - **Commit strategy**: 1 commit — `feat(reservations): add useReservations and useReservation read hooks`.
+- **Status (apply-phase-5, 2026-07-19)**: ✅ Complete (mock data path; real Supabase swap lands in Phase 7). `src/features/reservations/types.ts` (113 lines, `Reservation` interface denormalized with charger + renter + host info; `ReservationStatus` enum matching the SQL enum; `otherParty()` helper for the list/thread to pick the right participant; `isCancellable()` for the cancel button visibility; `timeBlock()` to centralize the structured-vs-free-text time display). `data/mockReservations.ts` (110 lines, 4 reservations: 3 as renter in `solicitada` / `confirmada` / `cancelada` states, 1 as host in `completada` — covers both renter and host views; `conversation_id` hardcoded to match the mock conversations). `hooks/useReservations.ts` (57 lines, `staleTime: 15_000`, gated on `userId` AND `isFeatureEnabled('RESERVATIONS')`; filters the mock list by `role` to match the segmented control). `hooks/useReservation.ts` (62 lines, throws `AppError code: 'not_found'` when the id is missing; same RESERVATIONS flag gate). Also dropped the Phase 1 `.gitkeep` placeholder that was tracked in main.
 
 ### Task 5.7: Reservas list screen with segmented control
 
@@ -522,6 +523,7 @@ Phase 1 (Foundation)
   - Host card shows the guest's name with a green "M" avatar.
   - Tapping a card navigates to `/reservation/[id]` (5.8).
 - **Commit strategy**: 1 commit — `feat(reservations): add two-tab segmented list with reservation cards`.
+- **Status (apply-phase-5, 2026-07-19)**: ✅ Complete. `app/(tabs)/reservations.tsx` (~265 lines, replaces the 27-line Phase 4 stub). Branches on `useSession()`: LoadingState during hydration, EmptyState with "Inicia sesion" CTA when no session, full list when signed in. Authed state renders a small inline `SegmentedControl` (pills, primary tint when selected) with the two spec-required tabs ("Mis reservas" / "En mis cargadores") and a `FlatList` of `ReservationRow`s (each row is a `ReservationCard` showing status pill, charger title, address, time block via the `timeBlock()` helper, power, and the other party's name + avatar via `otherParty()`). Different empty-state copy for "no reservations as renter" vs "no reservations as host". Tapping a row pushes to `/reservation/${id}`. **Note**: the user-prompt brief asked for "Proximas / Pasadas" segmented control; the spec is the source of truth and specifies "Mis reservas / En mis cargadores" (renter/host role split), so I followed the spec. Documented as a deviation from the user brief.
 
 ### Task 5.8: Reservation detail screen `/reservation/[id]`
 
@@ -532,6 +534,7 @@ Phase 1 (Foundation)
   - Shows charger info (with link to `/charger/[id]`), the other party's name, the time block, the status pill.
   - "Chatear" CTA navigates to `/messages/[threadId]` (thread id is the conversation id, found via `charger_id + currentUserId`).
 - **Commit strategy**: 1 commit — `feat(reservations): add reservation detail screen with Chatear CTA`.
+- **Status (apply-phase-5, 2026-07-19)**: ✅ Complete. `app/reservation/[id].tsx` (~310 lines, new route). Custom header (back arrow + "Detalle de reserva" title + status pill) built inline rather than via `Stack.Screen` options. Renders the full reservation: charger card (title, address, connector + power, "Como llegar" link that opens Google Maps with the charger's lat/lng), "Cuando" card with the `timeBlock()` output, other-party card (avatar + name + role label "Anfitrion" or "Huesped"), and an action row with a "Chatear" primary Button (navigates to `/messages/${conversation_id}`) and a "Cancelar reserva" danger Button (visible only when `isCancellable(status)` is true, per the spec). The cancel action uses `Alert.alert` with the spec copy "¿Cancelar la reserva de Cargador {title}?" and two actions: "Cancelar" (closes the dialog) and "Cancelar y volver" (currently shows a "Funcion proximamente" toast — the real `useCancelReservation` mutation lands in Phase 7 with the `system-message-injector` Edge Function). `ConfirmModal` (deferred from Phase 2) will replace the `Alert.alert` dialog in Phase 7.
 
 > **Phase 5 PR-C**: tasks 5.6 + 5.7 + 5.8. ~380 lines. Under 800.
 
