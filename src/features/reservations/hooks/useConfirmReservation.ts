@@ -46,6 +46,12 @@ const isMockSupabase = (): boolean =>
   process.env.EXPO_PUBLIC_MOCK_SUPABASE === 'true';
 
 export interface UseConfirmReservationResult {
+  // The parameter name is preserved for IDE intellisense on the
+  // public hook API. ESLint's bare `no-unused-vars` rule flags
+  // it as unused because the parameter is part of a function
+  // type, not a real call site. The disabled line below is the
+  // narrowest way to silence the warning without renaming.
+  // eslint-disable-next-line no-unused-vars
   confirm: (reservationId: string, currentStatus: ReservationStatus) => Promise<void>;
   isPending: boolean;
   error: AppError | null;

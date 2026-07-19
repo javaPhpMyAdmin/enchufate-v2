@@ -66,6 +66,12 @@ export interface CreateReservationResult {
 }
 
 export interface UseCreateReservationResult {
+  // The parameter name is `args` for IDE intellisense on the
+  // public hook API. ESLint's bare `no-unused-vars` rule flags
+  // it as unused because the parameter is part of a function
+  // type, not a real call site. The disabled line below is the
+  // narrowest way to silence the warning without renaming.
+  // eslint-disable-next-line no-unused-vars
   create: (args: CreateReservationArgs) => Promise<CreateReservationResult>;
   isPending: boolean;
   error: AppError | null;
