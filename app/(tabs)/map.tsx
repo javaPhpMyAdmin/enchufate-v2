@@ -237,7 +237,7 @@ export default function MapTab() {
               filter={['!', ['has', 'point_count']]}
               layout={{
                 'icon-image': CARGADOR_ICON_ID,
-                'icon-size': 0.15,
+                'icon-size': 0.12,
                 'icon-anchor': 'bottom',
                 'icon-allow-overlap': true,
               }}
