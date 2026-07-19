@@ -42,7 +42,7 @@ export default function InicioTab() {
       {/* Hero card: full-bleed car + charger photo (16:9 landscape, optimized JPG) */}
       <Card variant="elevated" padding="none" style={styles.heroCard}>
         <Image
-          source={require('@/../assets/images/home_card.jpg')}
+          source={require('@/../assets/images/home_hero_v2.jpg')}
           style={styles.heroImage}
           resizeMode="cover"
           accessibilityLabel="Auto eléctrico enchufado a un cargador"
