@@ -11,14 +11,15 @@
  *      so Inicio, Mapa, and the auth group can pad their content.
  *   4. `BottomSheetModalProvider` — required by `@gorhom/bottom-sheet`
  *      so the Filtros sheet on the Mapa tab can present/dismiss.
- *   5. `Stack` — Expo Router's navigator. The Stack auto-discovers
+ *   5. `useSession()` — mounted here (not in a screen) so the
+ *      `onAuthStateChange` subscription is alive for the entire
+ *      lifetime of the app. Any sign-in / sign-out / token refresh
+ *      event propagates to `useAuthStore` and to every screen that
+ *      reads `useSession()`. Rendering the hook's return value is
+ *      a no-op (`null`); we only need the side effects.
+ *   6. `Stack` — Expo Router's navigator. The Stack auto-discovers
  *      every file under `app/` (the 5-tab `(tabs)` group is wired in
- *      `app/(tabs)/_layout.tsx`).
- *
- * The `AuthProvider` lands in Phase 3 alongside the auth hooks; the
- * session shadow lives in `@/stores/authStore` and the per-tab gates
- * already render their `EmptyState` with an "Iniciá sesión" CTA until
- * Phase 3 swaps in `useSession`.
+ *      `app/(tabs)/_layout.tsx`; the auth flow is in `app/(auth)/`).
  */
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -27,9 +28,15 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { useSession } from '@/features/auth/hooks/useSession';
 import { queryClient } from '@/lib/queryClient';
 
 export default function RootLayout() {
+  // Mounted for its side effects (subscribes to onAuthStateChange,
+  // hydrates the auth store). The returned state is consumed by
+  // individual screens, not the layout.
+  useSession();
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
