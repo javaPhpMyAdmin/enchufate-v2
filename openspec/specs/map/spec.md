@@ -1,3 +1,4 @@
+<!-- Merged from mvp-bootstrap change on 2026-07-19 -->
 # Map Specification
 
 ## Purpose
