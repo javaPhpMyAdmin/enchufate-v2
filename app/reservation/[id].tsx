@@ -13,19 +13,20 @@
  *   - "Chatear" Button → navigates to the paired conversation
  *     thread at `/messages/[conversation_id]`
  *   - "Cancelar reserva" Button (only when `isCancellable(status)`
- *     is true) → shows a confirm dialog and (for Phase 5) a
- *     no-op handler. The actual cancel mutation lands in Phase 7
- *     with the `system-message-injector` Edge Function wiring.
+ *     is true) → opens a `ConfirmModal` (Phase 7 task 7.6). On
+ *     confirm, calls `useCancelReservation().cancel(id)` which
+ *     hits the real Supabase path (or the mock when the
+ *     MOCK_SUPABASE flag is on). The
+ *     `handle_reservation_cancelled_system_message` trigger
+ *     injects the voseo system message with the formatted
+ *     `time_desc` into the conversation.
  *
  * The cancel confirm copy is the spec-required "¿Cancelar la
- * reserva de Cargador {title}?" with two actions. For Phase 5
- * the "Cancelar y volver" action shows a brief "Función
- * próximamente" toast via `Alert.alert` because the real
- * `useCancelReservation` mutation lands in Phase 7. The
- * `ConfirmModal` atom (Phase 2 deferred) will replace this in
- * Phase 7 as well.
+ * reserva de {chargerTitle}?" with two actions: "Volver" (closes
+ * the modal) and "Cancelar y volver" (commits the cancel and
+ * pops the screen).
  */
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -51,9 +52,11 @@ import { Button } from '@/components/atoms/Button';
 import { Card } from '@/components/atoms/Card';
 import { StatusPill } from '@/components/atoms/StatusPill';
 import { Icon } from '@/components/atoms/Icon';
+import { ConfirmModal } from '@/components/molecules/ConfirmModal';
 import { ErrorState } from '@/components/molecules/ErrorState';
 import { LoadingState } from '@/components/molecules/LoadingState';
 import { useSession } from '@/features/auth/hooks/useSession';
+import { useCancelReservation } from '@/features/reservations/hooks/useCancelReservation';
 import { useReservation } from '@/features/reservations/hooks/useReservation';
 import {
   isCancellable,
@@ -72,27 +75,42 @@ export default function ReservationDetailScreen() {
   const { session, isLoading: sessionLoading } = useSession();
   const userId = session?.user.id ?? null;
   const reservation = useReservation(reservationId);
+  const { cancel, isPending: isCancelling, error: cancelError } = useCancelReservation();
 
-  const onCancel = useCallback(() => {
+  // The confirm modal visibility state. We hold the modal open
+  // while the mutation is in flight so the user can't double-tap;
+  // the Button's `loading` prop shows the spinner.
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+
+  // Surface mutation errors via an Alert. The hook already
+  // normalizes to AppError, so the `userMessage` is voseo + safe.
+  if (cancelError && !cancelModalVisible) {
+    Alert.alert('No pudimos cancelar la reserva', cancelError.userMessage);
+  }
+
+  const onCancelPress = useCallback(() => {
+    setCancelModalVisible(true);
+  }, []);
+
+  const onCancelConfirm = useCallback(async () => {
     if (!reservation.data) return;
-    const title = `¿Cancelar la reserva de ${reservation.data.charger_title}?`;
-    const message = 'Esta acción no se puede deshacer.';
-    Alert.alert(title, message, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Cancelar y volver',
-        style: 'destructive',
-        // Phase 5 mock — the real mutation lands in Phase 7 with
-        // the system-message-injector Edge Function wiring.
-        onPress: () => {
-          Alert.alert(
-            'Función próximamente',
-            'La cancelación real llega con la siguiente entrega del MVP.',
-          );
-        },
-      },
-    ]);
-  }, [reservation.data]);
+    try {
+      await cancel(reservation.data.id, reservation.data.status as ReservationStatus);
+      setCancelModalVisible(false);
+      // Pop back to the reservations list. The TanStack Query
+      // invalidations in the hook refresh the list on focus.
+      router.back();
+    } catch {
+      // The mutation already populates `cancelError`; the
+      // Alert.alert above surfaces it on the next render. We
+      // keep the modal open so the user can retry or close.
+    }
+  }, [cancel, reservation.data, router]);
+
+  const onCancelClose = useCallback(() => {
+    if (isCancelling) return; // ignore close while in flight
+    setCancelModalVisible(false);
+  }, [isCancelling]);
 
   const onOpenInMaps = useCallback(() => {
     if (!reservation.data) return;
@@ -262,12 +280,24 @@ export default function ReservationDetailScreen() {
               label="Cancelar reserva"
               variant="danger"
               fullWidth
-              onPress={onCancel}
+              onPress={onCancelPress}
               style={styles.cancelButton}
             />
           ) : null}
         </View>
       </ScrollView>
+
+      <ConfirmModal
+        visible={cancelModalVisible}
+        onClose={onCancelClose}
+        onConfirm={onCancelConfirm}
+        title={`¿Cancelar la reserva de ${r.charger_title}?`}
+        body="Esta acción no se puede deshacer."
+        confirmLabel="Cancelar y volver"
+        cancelLabel="Volver"
+        variant="danger"
+        loading={isCancelling}
+      />
     </View>
   );
 }

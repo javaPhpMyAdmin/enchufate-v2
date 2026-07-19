@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-na
 import { Calendar, Clock, MapPin, Zap } from 'lucide-react-native';
 
 import { Avatar } from '@/components/atoms/Avatar';
+import { Button } from '@/components/atoms/Button';
 import { Card } from '@/components/atoms/Card';
 import { Icon } from '@/components/atoms/Icon';
 import { StatusPill, type StatusPillKind } from '@/components/atoms/StatusPill';
@@ -20,6 +21,13 @@ export interface ReservationCardProps {
   otherPartyAvatarUri?: string | null;
   role: ReservationRole;
   onPress?: () => void;
+  /**
+   * Optional cancel handler. When provided AND the reservation
+   * status is cancellable (`solicitada` or `confirmada`), a
+   * secondary "Cancelar" Button renders below the meta rows. The
+   * parent owns the confirmation modal; the card just delegates.
+   */
+  onCancel?: () => void;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -34,8 +42,22 @@ export function ReservationCard({
   otherPartyAvatarUri,
   role,
   onPress,
+  onCancel,
   style,
 }: ReservationCardProps): React.JSX.Element {
+  // The cancel CTA only renders when the parent provides a
+  // handler AND the reservation is still cancellable. The
+  // inline check matches the `isCancellable` rule from
+  // `src/features/reservations/state-machine.ts` (true for
+  // 'solicitada' or 'confirmada'). We inline the check
+  // here because `status` is typed as `StatusPillKind` (which
+  // also includes 'disponible' for the charger-card reuse
+  // case) — calling the helper directly would error on the
+  // 'disponible' arm. The list screen + detail screen pass a
+  // `ReservationStatus` so the inline check covers the actual
+  // value domain.
+  const canCancel =
+    Boolean(onCancel) && (status === 'solicitada' || status === 'confirmada');
   return (
     <Card variant="default" padding="md" onPress={onPress} accessibilityLabel={chargerTitle} style={style}>
       <View style={styles.header}>
@@ -67,6 +89,18 @@ export function ReservationCard({
           <Text style={styles.metaText}>{formatPower(powerKw)}</Text>
         </View>
       </View>
+      {canCancel ? (
+        <View style={styles.actions}>
+          <Button
+            label="Cancelar reserva"
+            variant="secondary"
+            size="sm"
+            fullWidth
+            onPress={onCancel}
+            accessibilityLabel={`Cancelar reserva de ${chargerTitle}`}
+          />
+        </View>
+      ) : null}
     </Card>
   );
 }
@@ -83,4 +117,5 @@ const styles = StyleSheet.create({
   meta: { marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, gap: spacing.xs },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   metaText: { ...typography.caption, color: colors.textSecondary, flex: 1 },
+  actions: { marginTop: spacing.sm },
 });
