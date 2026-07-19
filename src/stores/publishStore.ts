@@ -8,13 +8,11 @@
  * (Phase 8 will add the cross-session resume edge case via the
  * query persister; for now the persist is in-session only).
  *
- * **Scope**: step 1 (name + description), step 2 (location), and
- * step 3 (connector + power) fields are persisted (PR-B and PR-C).
- * The store shape is extensible — PR-C also adds the step 4
- * `photos` field; PR-D will add pricing + schedule + rules.
- * Each step's `validateStepN(state)` is a pure function consumed
- * by the `<PublishWizardNav />` organism to gate the "Siguiente"
- * CTA.
+ * **Scope**: steps 1–4 fields are persisted (PR-B for 1–2; PR-C
+ * for 3–4). The store shape is extensible — PR-D will add
+ * pricing + schedule + rules. Each step's `validateStepN(state)`
+ * is a pure function consumed by the `<PublishWizardNav />`
+ * organism to gate the "Siguiente" CTA.
  *
  * **Why AsyncStorage, not SecureStore**: the wizard draft is NOT
  * sensitive data — it's title text and a lat/lng. SecureStore is
@@ -56,6 +54,8 @@ export interface PublishStoreState {
   connector_type: PublishConnectorType | null;
   /** Step 3 — power in kW (3.7–350). `null` until the user types. */
   power_kw: number | null;
+  /** Step 4 — local file URIs of the photos (1–5 entries). Compressed by `imageUpload.ts` before storing. */
+  photos: string[];
 
   // ----- Actions -----
   /** Hard-set the wizard step (used by each screen's mount effect). */
@@ -65,6 +65,8 @@ export interface PublishStoreState {
   setLocation: (loc: PublishLocation | null) => void;
   setConnectorType: (t: PublishConnectorType) => void;
   setPowerKw: (n: number | null) => void;
+  /** Replace the photos array wholesale (the screen owns the array). */
+  setPhotos: (uris: string[]) => void;
   /** Advance the step counter (clamped to 1–7). */
   nextStep: () => void;
   /** Regress the step counter (clamped to 1–7). */
@@ -79,7 +81,7 @@ export interface PublishStoreState {
 
 const INITIAL: Pick<
   PublishStoreState,
-  'step' | 'name' | 'description' | 'location' | 'connector_type' | 'power_kw'
+  'step' | 'name' | 'description' | 'location' | 'connector_type' | 'power_kw' | 'photos'
 > = {
   step: 1,
   name: '',
@@ -87,6 +89,7 @@ const INITIAL: Pick<
   location: null,
   connector_type: null,
   power_kw: null,
+  photos: [],
 };
 
 /* ------------------------------------------------------------------ */
@@ -170,6 +173,29 @@ export function validateStep3(
   return { valid: errors.length === 0, errors };
 }
 
+/** Max photos per charger (mirrors `chargerSchema.shape.photos` max). */
+export const PUBLISH_PHOTOS_MAX = 5;
+/** Min photos per charger (1, per the spec — at least one preview required). */
+export const PUBLISH_PHOTOS_MIN = 1;
+
+/**
+ * Pure validation for step 4 (photos). The spec requires at least
+ * one photo and at most `PUBLISH_PHOTOS_MAX`. The screen enforces
+ * the cap at the picker level (`selectionLimit: 5 - currentCount`)
+ * so the validator only needs to check the lower bound.
+ */
+export function validateStep4(
+  state: Pick<PublishStoreState, 'photos'>,
+): StepValidation {
+  const errors: string[] = [];
+  if (state.photos.length < PUBLISH_PHOTOS_MIN) {
+    errors.push('Subí al menos una foto del cargador');
+  } else if (state.photos.length > PUBLISH_PHOTOS_MAX) {
+    errors.push(`Máximo ${PUBLISH_PHOTOS_MAX} fotos`);
+  }
+  return { valid: errors.length === 0, errors };
+}
+
 /* ------------------------------------------------------------------ */
 /* Store                                                                */
 /* ------------------------------------------------------------------ */
@@ -182,6 +208,7 @@ const creator: StateCreator<PublishStoreState> = (set) => ({
   setLocation: (loc) => set({ location: loc }),
   setConnectorType: (t) => set({ connector_type: t }),
   setPowerKw: (n) => set({ power_kw: n }),
+  setPhotos: (uris) => set({ photos: uris }),
   nextStep: () =>
     set((s) => ({
       step: Math.min(7, s.step + 1) as PublishStep,
@@ -213,6 +240,7 @@ export const usePublishStore = create<PublishStoreState>()(
       location: s.location,
       connector_type: s.connector_type,
       power_kw: s.power_kw,
+      photos: s.photos,
     }),
   }),
 );
