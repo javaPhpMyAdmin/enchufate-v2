@@ -265,54 +265,56 @@ Phase 1 (Foundation)
 > **Goal**: Users can sign up, sign in, sign out, and reset their password; Google OAuth button is wired (manual Supabase dashboard config is the user's first-day task).
 > **PR**: **1 PR (~620 lines)** — within budget.
 
-### Task 3.1: Auth hooks (useSession, useRequireAuth, useSignIn, useSignUp, useSignOut)
+### Task 3.1: Auth hooks (useSession, useRequireAuth, useSignIn, useSignUp, useSignOut) ✅
 
 - **Files**: `/Users/marcelobatista/Desktop/enchufate-V2/src/features/auth/types.ts` (new, ~20), `src/features/auth/hooks/useSession.ts` (~35), `useRequireAuth.ts` (~30), `useSignIn.ts` (~40), `useSignUp.ts` (~40), `useSignOut.ts` (~25).
 - **Estimated lines**: ~190 lines.
 - **Dependencies**: 1.3, 1.4.
 - **Acceptance criteria**:
-  - `useSession()` returns `{ session, user, isLoading }` and listens to `supabase.auth.onAuthStateChange`.
-  - `useRequireAuth(returnTo)` triggers `router.push('/login?returnTo=...')` if `session === null`.
-  - `useSignIn` / `useSignUp` are debounced 800ms on submit; errors are surfaced as `AppError`.
-  - `useSignOut` clears the TanStack Query cache and redirects to `/profile`.
-- **Commit strategy**: 2 commits — `feat(auth): add useSession, useRequireAuth, useSignIn, useSignUp` then `feat(auth): add useSignOut with cache clearing`.
+  - `useSession()` returns `{ session, user, isLoading }` and listens to `supabase.auth.onAuthStateChange`. ✅
+  - `useRequireAuth(returnTo)` triggers `router.push('/login?returnTo=...')` if `session === null`. ✅
+  - `useSignIn` / `useSignUp` are debounced 800ms on submit; errors are surfaced as `AppError`. ✅
+  - `useSignOut` clears the TanStack Query cache and redirects to `/profile`. ✅ (redirects to `/` per design — auth-gated tabs re-render their EmptyState, so home is friendlier)
+- **Commit strategy**: 2 commits — `feat(auth): add useSession, useRequireAuth, useSignIn, useSignUp` then `feat(auth): add useSignOut with cache clearing`. ✅ Delivered as 2 commits + a shared `_debounce.ts` helper.
 
-### Task 3.2: useGoogleOAuth + useResetPassword + authStore
+### Task 3.2: useGoogleOAuth + useResetPassword + authStore ✅
 
 - **Files**: `/Users/marcelobatista/Desktop/enchufate-V2/src/features/auth/hooks/useGoogleOAuth.ts` (new, ~55), `useResetPassword.ts` (~30), `/Users/marcelobatista/Desktop/enchufate-V2/src/stores/authStore.ts` (new, ~35).
 - **Estimated lines**: ~120 lines.
 - **Dependencies**: 1.3, 3.1.
 - **Acceptance criteria**:
-  - `useGoogleOAuth` calls `supabase.auth.signInWithOAuth({ provider: 'google' })` via `expo-auth-session`'s `WebBrowser.openAuthSessionAsync`.
-  - `useResetPassword` calls `supabase.auth.resetPasswordForEmail(email, { redirectTo })`.
-  - `authStore` shadows the session for non-React readers.
-- **Commit strategy**: 1 commit — `feat(auth): add Google OAuth, password reset, and auth state shadow store`.
+  - `useGoogleOAuth` calls `supabase.auth.signInWithOAuth({ provider: 'google' })` via `expo-auth-session`'s `WebBrowser.openAuthSessionAsync`. ✅ (uses `expo-web-browser.openAuthSessionAsync` directly; design calls for `expo-auth-session` but the modern Expo SDK 54 path is `expo-web-browser`. Dep added via `npx --yes expo install`.)
+  - `useResetPassword` calls `supabase.auth.resetPasswordForEmail(email, { redirectTo })`. ✅
+  - `authStore` shadows the session for non-React readers. ✅
+- **Commit strategy**: 1 commit — `feat(auth): add Google OAuth, password reset, and auth state shadow store`. ✅
 
-### Task 3.3: Login / Signup / Reset screens + auth group layout
+### Task 3.3: Login / Signup / Reset screens + auth group layout ✅
 
 - **Files**: `/Users/marcelobatista/Desktop/enchufate-V2/app/(auth)/_layout.tsx` (~25), `login.tsx` (~140), `signup.tsx` (~140), `reset.tsx` (~90).
 - **Estimated lines**: ~395 lines.
 - **Dependencies**: 2.2, 3.1, 3.2.
 - **Acceptance criteria**:
-  - Login screen reads `useLocalSearchParams<{ returnTo?: string }>()` and validates against the allow-list `['/profile', '/reservations', '/messages', '/publish/1-name', '/charger/*']`.
-  - Login includes email, password (with show/hide), "Olvidé mi contraseña" link, "Crear cuenta" link, and a "Continuar con Google" `Button` below a `Divider` with "o continuá con" label.
-  - Signup displays "Te enviamos un correo para verificar tu cuenta" on success.
-  - Reset displays "Revisá tu correo para restablecer la contraseña" on success.
-  - All three render `LoadingState` / `ErrorState` on async states.
-- **Commit strategy**: 2 commits — `feat(auth): add login and signup screens with returnTo handling` then `feat(auth): add password reset screen and auth group layout`.
+  - Login screen reads `useLocalSearchParams<{ returnTo?: string }>()` and validates against the allow-list `['/profile', '/reservations', '/messages', '/publish/1-name', '/charger/*']`. ✅
+  - Login includes email, password (with show/hide), "Olvidé mi contraseña" link, "Crear cuenta" link, and a "Continuar con Google" `Button` below a `Divider` with "o continuá con" label. ✅
+  - Signup displays "Te enviamos un correo para verificar tu cuenta" on success. ✅
+  - Reset displays "Revisá tu correo para restablecer la contraseña" on success. ✅
+  - All three render `LoadingState` / `ErrorState` on async states. ✅
+- **Commit strategy**: 2 commits — `feat(auth): add login and signup screens with returnTo handling` then `feat(auth): add password reset screen and auth group layout`. ✅ Delivered as 1 commit (3 screens) — under 800 lines per file.
 
-### Task 3.4: Root layout auth listener + returnTo allow-list
+### Task 3.4: Root layout auth listener + returnTo allow-list ✅
 
 - **Files**: `/Users/marcelobatista/Desktop/enchufate-V2/app/_layout.tsx` (modified, +20 lines), `/Users/marcelobatista/Desktop/enchufate-V2/src/features/auth/allowList.ts` (new, ~20).
 - **Estimated lines**: ~40 lines.
 - **Dependencies**: 3.1, 3.3.
 - **Acceptance criteria**:
-  - `app/_layout.tsx` calls `supabase.auth.onAuthStateChange` and seeds `useAuthStore`.
-  - `allowList` exports an `isAllowedReturnTo(path: string): boolean` function used by the login screen.
-  - After `SIGNED_IN`, login navigates via `router.replace(returnTo)` or `router.replace('/(tabs)')` as fallback.
-- **Commit strategy**: 1 commit — `feat(auth): wire root auth listener and returnTo allow-list`.
+  - `app/_layout.tsx` calls `supabase.auth.onAuthStateChange` and seeds `useAuthStore`. ✅
+  - `allowList` exports an `isAllowedReturnTo(path: string): boolean` function used by the login screen. ✅
+  - After `SIGNED_IN`, login navigates via `router.replace(returnTo)` or `router.replace('/(tabs)')` as fallback. ✅
+- **Commit strategy**: 1 commit — `feat(auth): wire root auth listener and returnTo allow-list`. ✅
 
 > **Phase 3 PR**: tasks 3.1 → 3.4. ~620 lines. Single PR, but split into 6 conventional commits so each commit is reviewable on its own.
+
+**Apply progress (2026-07-19):** 7 commits on main (`34234d8`, `5a5035b`, `3716dab`, `51bd5ae`, `db6b222`, `a4ce780`, `cbd7ec0`). Total 1415 insertions / 11 deletions across 21 files — **OVER the 800-line PR review budget** (1.77x). Each commit is under 400 lines and independently reviewable, so the user can keep them as 1 PR (squash) or split into 2 stacked PRs at the natural foundation/UI boundary (after commit `51bd5ae`). Files: `src/features/auth/{types,allowList}.ts`, `src/features/auth/stores/authStore.ts`, `src/features/auth/hooks/{_debounce,useSession,useRequireAuth,useSignIn,useSignUp,useSignOut,useGoogleOAuth,useResetPassword}.ts`, `app/(auth)/{_layout,login,signup,reset}.tsx`, `app/_layout.tsx`, `src/components/atoms/Input.tsx`, `package.json` + `pnpm-lock.yaml` + `app.json` (for `expo-web-browser@~15.0.11`).
 
 ---
 
