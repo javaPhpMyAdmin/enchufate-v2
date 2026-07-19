@@ -8,11 +8,13 @@
  * (Phase 8 will add the cross-session resume edge case via the
  * query persister; for now the persist is in-session only).
  *
- * **Scope in PR-B**: only step 1 (name + description) and step 2
- * (location) fields are persisted. The store shape is extensible —
- * PR-C adds connector + photos, PR-D adds pricing + schedule + rules.
- * Each step's `validateStepN(state)` is a pure function consumed by
- * the `<PublishWizardNav />` organism to gate the "Siguiente" CTA.
+ * **Scope**: step 1 (name + description), step 2 (location), and
+ * step 3 (connector + power) fields are persisted (PR-B and PR-C).
+ * The store shape is extensible — PR-C also adds the step 4
+ * `photos` field; PR-D will add pricing + schedule + rules.
+ * Each step's `validateStepN(state)` is a pure function consumed
+ * by the `<PublishWizardNav />` organism to gate the "Siguiente"
+ * CTA.
  *
  * **Why AsyncStorage, not SecureStore**: the wizard draft is NOT
  * sensitive data — it's title text and a lat/lng. SecureStore is
@@ -32,6 +34,9 @@ import { chargerSchema } from '@/lib/schemas/charger';
 
 export type PublishStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
+/** Connector kinds — mirrors `chargerSchema.shape.connector_type`. */
+export type PublishConnectorType = 'tipo_1' | 'tipo_2' | 'ccs' | 'chademo' | 'tesla';
+
 export interface PublishLocation {
   lat: number | null;
   lng: number | null;
@@ -47,6 +52,10 @@ export interface PublishStoreState {
   description: string;
   /** Step 2 — location + editable address. `null` until step 2 starts. */
   location: PublishLocation | null;
+  /** Step 3 — connector kind. `null` until the user picks one. */
+  connector_type: PublishConnectorType | null;
+  /** Step 3 — power in kW (3.7–350). `null` until the user types. */
+  power_kw: number | null;
 
   // ----- Actions -----
   /** Hard-set the wizard step (used by each screen's mount effect). */
@@ -54,6 +63,8 @@ export interface PublishStoreState {
   setName: (s: string) => void;
   setDescription: (s: string) => void;
   setLocation: (loc: PublishLocation | null) => void;
+  setConnectorType: (t: PublishConnectorType) => void;
+  setPowerKw: (n: number | null) => void;
   /** Advance the step counter (clamped to 1–7). */
   nextStep: () => void;
   /** Regress the step counter (clamped to 1–7). */
@@ -68,12 +79,14 @@ export interface PublishStoreState {
 
 const INITIAL: Pick<
   PublishStoreState,
-  'step' | 'name' | 'description' | 'location'
+  'step' | 'name' | 'description' | 'location' | 'connector_type' | 'power_kw'
 > = {
   step: 1,
   name: '',
   description: '',
   location: null,
+  connector_type: null,
+  power_kw: null,
 };
 
 /* ------------------------------------------------------------------ */
@@ -134,6 +147,29 @@ export function validateStep2(state: Pick<PublishStoreState, 'location'>): StepV
   return { valid: errors.length === 0, errors };
 }
 
+/**
+ * Pure validation for step 3 (connector + power). Mirrors
+ * `chargerSchema.shape.connector_type` (5 enum values) and
+ * `chargerSchema.shape.power_kw` (3.7–350) so the form limits
+ * stay in lockstep with the server-side CHECK constraints.
+ */
+export function validateStep3(
+  state: Pick<PublishStoreState, 'connector_type' | 'power_kw'>,
+): StepValidation {
+  const errors: string[] = [];
+  if (state.connector_type === null) {
+    errors.push('Elegí un tipo de conector');
+  }
+  if (state.power_kw === null || Number.isNaN(state.power_kw)) {
+    errors.push('Ingresá la potencia del cargador');
+  } else if (state.power_kw < 3.7) {
+    errors.push('La potencia mínima es 3.7 kW');
+  } else if (state.power_kw > 350) {
+    errors.push('La potencia máxima es 350 kW');
+  }
+  return { valid: errors.length === 0, errors };
+}
+
 /* ------------------------------------------------------------------ */
 /* Store                                                                */
 /* ------------------------------------------------------------------ */
@@ -144,6 +180,8 @@ const creator: StateCreator<PublishStoreState> = (set) => ({
   setName: (s) => set({ name: s }),
   setDescription: (s) => set({ description: s }),
   setLocation: (loc) => set({ location: loc }),
+  setConnectorType: (t) => set({ connector_type: t }),
+  setPowerKw: (n) => set({ power_kw: n }),
   nextStep: () =>
     set((s) => ({
       step: Math.min(7, s.step + 1) as PublishStep,
@@ -173,6 +211,8 @@ export const usePublishStore = create<PublishStoreState>()(
       name: s.name,
       description: s.description,
       location: s.location,
+      connector_type: s.connector_type,
+      power_kw: s.power_kw,
     }),
   }),
 );

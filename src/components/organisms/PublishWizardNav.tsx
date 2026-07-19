@@ -8,7 +8,8 @@
  * **Validation**: the Siguiente CTA stays disabled until the current
  * step's `validateStepN` returns `valid: true`. The validator
  * dispatcher below is the single source of truth for "which step
- * is valid" — PR-C and PR-D add validators 3–7 as those steps land.
+ * is valid" — PR-C adds step 3 (and step 4 will land in PR-C commit
+ * 2); PR-D adds validators 5–7 as those steps land.
  *
  * **Navigation**: both buttons call the store's `nextStep()` /
  * `prevStep()` actions, which mutate `step`. The publish layout
@@ -33,6 +34,7 @@ import {
   usePublishStore,
   validateStep1,
   validateStep2,
+  validateStep3,
   type PublishStep,
 } from '@/stores/publishStore';
 
@@ -40,19 +42,27 @@ const TOTAL_STEPS = 7;
 
 /**
  * Dispatches to the right `validateStepN` for the current step.
- * Steps 3–7 don't have a PR-B validator yet; we return `valid: false`
- * so the Siguiente stays disabled. PR-C and PR-D add validators as
- * those steps land.
+ * Steps 4–7 don't have a PR-C validator yet; we return `valid: false`
+ * so the Siguiente stays disabled. PR-C commit 2 (step 4) and
+ * PR-D (steps 5–7) add validators as those steps land.
  */
 function validateCurrentStep(
   step: PublishStep,
-  state: { name: string; description: string; location: { lat: number | null; lng: number | null; address: string } | null },
+  state: {
+    name: string;
+    description: string;
+    location: { lat: number | null; lng: number | null; address: string } | null;
+    connector_type: 'tipo_1' | 'tipo_2' | 'ccs' | 'chademo' | 'tesla' | null;
+    power_kw: number | null;
+  },
 ): boolean {
   switch (step) {
     case 1:
       return validateStep1(state).valid;
     case 2:
       return validateStep2(state).valid;
+    case 3:
+      return validateStep3(state).valid;
     default:
       // No validator yet — keep the CTA disabled to prevent advancing
       // into a step that doesn't exist in this PR.
@@ -66,10 +76,18 @@ export function PublishWizardNav(): React.JSX.Element {
   const name = usePublishStore((s) => s.name);
   const description = usePublishStore((s) => s.description);
   const location = usePublishStore((s) => s.location);
+  const connector_type = usePublishStore((s) => s.connector_type);
+  const power_kw = usePublishStore((s) => s.power_kw);
   const nextStep = usePublishStore((s) => s.nextStep);
   const prevStep = usePublishStore((s) => s.prevStep);
 
-  const canAdvance = validateCurrentStep(step, { name, description, location });
+  const canAdvance = validateCurrentStep(step, {
+    name,
+    description,
+    location,
+    connector_type,
+    power_kw,
+  });
   const isFirstStep = step === 1;
   const isFinalStep = step === 7;
   const ctaLabel = isFinalStep ? 'Publicar' : 'Siguiente';
