@@ -34,9 +34,15 @@
  *     console so a developer can confirm the right flags are on for
  *     the build. The actual gating happens in each feature hook
  *     (`isFeatureEnabled('CHAT')` etc.) per the no-React-Context rule.
+ *   - **Query persister** — mirrors the TanStack Query cache into
+ *     `AsyncStorage` for 24h so the messaging / reservation lists
+ *     rehydrate on the first render after a cold start. The persister
+ *     lives in `src/lib/queryPersister.ts`; the wiring is the only
+ *     line of code the layout owns.
  */
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { persistQueryClient } from '@tanstack/query-persist-client-core';
 import { Asset } from 'expo-asset';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -48,6 +54,10 @@ import { ErrorBoundary } from '@/components/molecules/ErrorBoundary';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { FEATURES, isFeatureEnabled } from '@/lib/features';
 import { queryClient } from '@/lib/queryClient';
+import {
+  QUERY_CACHE_MAX_AGE_MS,
+  asyncStoragePersister,
+} from '@/lib/queryPersister';
 
 export default function RootLayout() {
   // Mounted for its side effects (subscribes to onAuthStateChange,
@@ -87,8 +97,21 @@ export default function RootLayout() {
       );
     }
 
+    // 3. Query persister — hydrate the cache on boot, then keep it
+    //    in sync for 24h. The teardown function (first element of
+    //    the tuple) is called on layout unmount — which never
+    //    happens in practice (the layout lives for the whole app)
+    //    but is wired for completeness so HMR can re-run the effect
+    //    without leaking the previous subscription.
+    const [unsubscribe] = persistQueryClient({
+      queryClient,
+      persister: asyncStoragePersister,
+      maxAge: QUERY_CACHE_MAX_AGE_MS,
+    });
+
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, []);
 
