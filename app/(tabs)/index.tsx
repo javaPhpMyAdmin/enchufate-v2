@@ -39,12 +39,12 @@ export default function InicioTab() {
         <Text style={styles.wordmark}>Enchufate</Text>
       </View>
 
-      {/* Hero card: car + charger photo (16:9, user-provided PNG) */}
+      {/* Hero card: car + charger photo (16:9, user-provided PNG, contain) */}
       <Card variant="elevated" padding="none" style={styles.heroCard}>
         <Image
           source={require('@/../assets/images/home_card.png')}
           style={StyleSheet.absoluteFill}
-          resizeMode="cover"
+          resizeMode="contain"
           accessibilityLabel="Auto eléctrico enchufado a un cargador"
         />
       </Card>
@@ -112,11 +112,13 @@ const styles = StyleSheet.create({
   wordmark: { ...typography.display, color: colors.primary, fontSize: 28 },
 
   // Hero card — locked to 16:9 with absoluteFill image so the card
-  // itself (not just the child) enforces the aspect ratio.
+  // itself (not just the child) enforces the aspect ratio. Background
+  // uses a neutral tone so the contain-mode letterbox blends in.
   heroCard: {
     marginBottom: spacing.xs,
     aspectRatio: 16 / 9,
     overflow: 'hidden',
+    backgroundColor: colors.background,
   },
   heroCardSolid: {
     marginBottom: spacing.xs,
