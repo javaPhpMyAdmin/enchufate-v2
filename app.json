@@ -17,7 +17,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.enchufate.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Enchufate usa tu ubicación para mostrar cargadores cercanos y centrar el mapa."
+        "NSLocationWhenInUseUsageDescription": "Enchufate usa tu ubicación para mostrar cargadores cercanos y centrar el mapa.",
+        "NSPhotoLibraryUsageDescription": "Enchufate necesita acceso a tus fotos para que puedas mostrar tu cargador."
       }
     },
     "android": {
@@ -28,7 +29,9 @@
       "package": "com.enchufate.app",
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE"
       ]
     },
     "web": {
