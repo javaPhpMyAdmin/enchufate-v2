@@ -668,6 +668,26 @@ Phase 1 (Foundation)
 
 > **Phase 6 PR-D**: task 6.8 alone. ~505 lines. Under 800.
 
+- **Status (apply-phase-6-pr-d, 2026-07-19)**: ✅ Complete. 3 work-unit commits on `phase-6-pr-d-publish-finish` (off main HEAD `4215fff`). Commits: `97bd693` (step 5 + step 6 + publishStore fields 5-7 + PublishWizardNav dispatcher update), `bf36a99` (step 7 + `usePublishCharger` mutation + PublishWizardNav `onPrimaryPress` switch to `publish()` on step 7 with `loading` state), `2a1759e` (success screen). 5 files changed, 1139 insertions, 44 deletions. Source-only ~1139 lines (~125% OVER the brief's 505-line estimate; ~42% over the 800-line PR review budget — the schedule editor at 288 lines vs the 140 estimate is the largest single-file deviation, driven by the 3-mode per-day UI: 7 day rows × 3 chip options + conditional `Input` pair for "Personalizar" + per-row open/closed state). Each commit is independently reviewable and has a single deliverable behavior: (1) pricing + schedule UI, (2) rules + mutation, (3) success screen. The PR-D mock `usePublishCharger` validates the full draft via `chargerSchema.parse(...)` (real), simulates 400ms per photo upload + 400ms insert with `setTimeout`, and returns a generated `chargerId` (no real DB row). All the `// TODO Phase 7` comments mark where the real `supabase.storage.from('charger-photos').upload(...)` and `supabase.from('chargers').insert(...)` calls will go. On success the mutation invalidates `['chargers']` + `['my-chargers', userId]`, calls `publishStore.resetWizard()`, and `router.replace('/publish/success')`. The PublishWizardNav's primary CTA at step 7 reads "Publicar" and on press calls `publish()`; while the mutation is in flight the Button shows the loading spinner (the existing `loading` prop on the Button atom). The success screen renders a `CheckCircle2` icon, "¡Cargador publicado!" title, voseo body copy, and a "Ir a Mis cargadores" Button that navigates to `/(tabs)/profile` (where `useMyChargers` from Phase 5 PR-A picks up the new charger on the next refetch).
+
+### Phase 6 complete — 2026-07-19
+
+All 4 chained PRs for Phase 6 are merged to `main`:
+
+| PR | Branch | Tasks | Commits | Source |
+|----|--------|-------|---------|--------|
+| PR-A | `phase-6-pr-a-charger-detail` | 6.1 + 6.2 + 6.3 (charger detail + RLS + Zod schemas) | 5 | ~1115 |
+| PR-B | `phase-6-pr-b-publish-infra` | 6.4 + 6.5 + 6.6 (publish infra + steps 1-2) | 4 | ~859 |
+| PR-C | `phase-6-pr-c-publish-steps-3-4` | 6.7 (steps 3-4: connector + photos) | 3 | ~736 |
+| PR-D | `phase-6-pr-d-publish-finish` | 6.8 (steps 5-7 + mutation + success) | 4 | ~1139 |
+| **Total** | | | **16** | **~3849** |
+
+**End state**: a host can complete the 7-step Publicar wizard, the `usePublishCharger` mutation validates the full draft against `chargerSchema`, persists (mock for now), and lands the user on a success screen that links to their profile. A guest can open `/charger/[id]` from the map and see the full charger detail with photo gallery, identity block, map snippet, host info, rules, and a sticky "Reservar" CTA. The actual reservation submission flow is Phase 7.
+
+**Chain strategy used**: `stacked-to-main` — each PR was a sibling branch off `main` (never a stack of dependent branches). The user merged each one in order before the next PR was cut, per the "1 PR per session, review in editor between PRs" preference set on 2026-07-19. All 4 PRs went over the 800-line review budget (1.07x–1.42x); the per-commit work-unit structure kept each commit independently reviewable.
+
+**What's deferred**: (a) real Supabase mutations in `usePublishCharger` (Phase 7 task 7.3 hooks + 7.1 RLS migrations), (b) real reverse geocoding on step 2 (Phase 8 task 8.3), (c) publish wizard exit guard + loading skeletons (Phase 8 task 8.5), (d) `ReservationRequestSheet` real implementation (Phase 7 task 7.6). The mock `usePublishCharger` validates the full payload client-side via `chargerSchema.parse(...)` so any drift between the client shape and the server contract surfaces immediately when Phase 7 lands.
+
 ---
 
 ## Phase 7: Reservation lifecycle

@@ -8,11 +8,10 @@
  * (Phase 8 will add the cross-session resume edge case via the
  * query persister; for now the persist is in-session only).
  *
- * **Scope**: steps 1–4 fields are persisted (PR-B for 1–2; PR-C
- * for 3–4). The store shape is extensible — PR-D will add
- * pricing + schedule + rules. Each step's `validateStepN(state)`
- * is a pure function consumed by the `<PublishWizardNav />`
- * organism to gate the "Siguiente" CTA.
+ * **Scope**: every step's data is persisted. PR-B shipped 1–2,
+ * PR-C shipped 3–4, PR-D ships 5–7. Each step's `validateStepN`
+ * is a pure function consumed by `<PublishWizardNav />` to gate
+ * the "Siguiente" CTA.
  *
  * **Why AsyncStorage, not SecureStore**: the wizard draft is NOT
  * sensitive data — it's title text and a lat/lng. SecureStore is
@@ -25,6 +24,7 @@ import { create, type StateCreator } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { chargerSchema } from '@/lib/schemas/charger';
+import type { ChargerSchedule, DayKey, DayWindow, MinReservationMinutes } from '@/features/chargers/types';
 
 /* ------------------------------------------------------------------ */
 /* Types                                                                */
@@ -41,6 +41,59 @@ export interface PublishLocation {
   address: string;
 }
 
+/** Step 5 — pricing data. */
+export interface PublishPricing {
+  /** Price in USD per hour. `null` until the user types something. */
+  price_per_hour_usd: number | null;
+  /** Minimum reservation duration in minutes. Defaults to 30. */
+  min_reservation_minutes: MinReservationMinutes;
+}
+
+/**
+ * The 7 day-keys. Centralized here so the wizard's UI loop and the
+ * `chargerSchema.schedule` shape stay in lockstep.
+ */
+export const PUBLISH_DAY_KEYS: readonly DayKey[] = [
+  'mon',
+  'tue',
+  'wed',
+  'thu',
+  'fri',
+  'sat',
+  'sun',
+] as const;
+
+/** Day-key → display name (Rioplatense). */
+export const PUBLISH_DAY_LABELS: Record<DayKey, string> = {
+  mon: 'Lunes',
+  tue: 'Martes',
+  wed: 'Miércoles',
+  thu: 'Jueves',
+  fri: 'Viernes',
+  sat: 'Sábado',
+  sun: 'Domingo',
+};
+
+/** Day-key → short display name (for tight rows). */
+export const PUBLISH_DAY_LABELS_SHORT: Record<DayKey, string> = {
+  mon: 'Lun',
+  tue: 'Mar',
+  wed: 'Mié',
+  thu: 'Jue',
+  fri: 'Vie',
+  sat: 'Sáb',
+  sun: 'Dom',
+};
+
+/** 24/7 window — used as the default for every day in step 6. */
+export const ALWAYS_AVAILABLE_WINDOW: DayWindow = { from: '00:00', to: '23:59' };
+
+/** Default schedule — every day open 24/7. Matches `chargers.schedule` jsonb default. */
+export const DEFAULT_SCHEDULE: ChargerSchedule = PUBLISH_DAY_KEYS.reduce(
+  (acc, k) => ({ ...acc, [k]: [ALWAYS_AVAILABLE_WINDOW] }),
+  {} as ChargerSchedule,
+);
+
 export interface PublishStoreState {
   /** Current step (1–7). Drives the progress bar and Siguiente label. */
   step: PublishStep;
@@ -56,6 +109,17 @@ export interface PublishStoreState {
   power_kw: number | null;
   /** Step 4 — local file URIs of the photos (1–5 entries). Compressed by `imageUpload.ts` before storing. */
   photos: string[];
+  /** Step 5 — pricing. `price_per_hour_usd` is `null` until the user types. */
+  pricing: PublishPricing;
+  /**
+   * Step 6 — per-day availability windows. Shape mirrors the
+   * `chargers.schedule` jsonb column exactly: 7 day keys, each value
+   * is an array of `{ from: 'HH:MM', to: 'HH:MM' }` windows. Empty
+   * array = day closed. Single `[{00:00, 23:59}]` window = 24/7.
+   */
+  schedule: ChargerSchedule;
+  /** Step 7 — optional house rules (≤300 chars per `chargerSchema.rules`). */
+  rules: string;
 
   // ----- Actions -----
   /** Hard-set the wizard step (used by each screen's mount effect). */
@@ -67,11 +131,19 @@ export interface PublishStoreState {
   setPowerKw: (n: number | null) => void;
   /** Replace the photos array wholesale (the screen owns the array). */
   setPhotos: (uris: string[]) => void;
+  /** Replace `price_per_hour_usd` (used by the numeric input). */
+  setPricePerHour: (n: number | null) => void;
+  /** Replace `min_reservation_minutes` (used by the chip group). */
+  setMinReservation: (m: MinReservationMinutes) => void;
+  /** Patch a single day's window array. */
+  setDaySchedule: (k: DayKey, windows: DayWindow[]) => void;
+  /** Replace the rules text. */
+  setRules: (s: string) => void;
   /** Advance the step counter (clamped to 1–7). */
   nextStep: () => void;
   /** Regress the step counter (clamped to 1–7). */
   prevStep: () => void;
-  /** Wipe the draft (called by usePublishCharger on success in PR-D). */
+  /** Wipe the draft (called by usePublishCharger on success). */
   resetWizard: () => void;
 }
 
@@ -81,7 +153,7 @@ export interface PublishStoreState {
 
 const INITIAL: Pick<
   PublishStoreState,
-  'step' | 'name' | 'description' | 'location' | 'connector_type' | 'power_kw' | 'photos'
+  'step' | 'name' | 'description' | 'location' | 'connector_type' | 'power_kw' | 'photos' | 'pricing' | 'schedule' | 'rules'
 > = {
   step: 1,
   name: '',
@@ -90,6 +162,9 @@ const INITIAL: Pick<
   connector_type: null,
   power_kw: null,
   photos: [],
+  pricing: { price_per_hour_usd: null, min_reservation_minutes: 30 },
+  schedule: DEFAULT_SCHEDULE,
+  rules: '',
 };
 
 /* ------------------------------------------------------------------ */
@@ -196,6 +271,66 @@ export function validateStep4(
   return { valid: errors.length === 0, errors };
 }
 
+/**
+ * Pure validation for step 5 (pricing). Mirrors
+ * `chargerSchema.shape.price_per_hour_usd` (>0) and the min
+ * reservation enum (one of 30/60/120/240/480 per
+ * `chargerSchema.shape.min_reservation_minutes`).
+ */
+export function validateStep5(state: Pick<PublishStoreState, 'pricing'>): StepValidation {
+  const errors: string[] = [];
+  const { price_per_hour_usd } = state.pricing;
+  if (price_per_hour_usd === null || Number.isNaN(price_per_hour_usd)) {
+    errors.push('Ingresá el precio por hora');
+  } else if (price_per_hour_usd <= 0) {
+    errors.push('El precio tiene que ser mayor a 0');
+  }
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Pure validation for step 6 (schedule). The 7 day-keys must all
+ * be present (a missing key would fail the jsonb `CHECK`); each
+ * day must have at least one window unless the user explicitly
+ * closed it (empty array = closed, which is a valid state). The
+ * `chargerSchema` validates the same shape on the mutation side.
+ *
+ * The CTA is enabled as long as at least one day is open (always
+ * or custom) — closing all 7 days leaves nothing bookable, which
+ * would be confusing UX.
+ */
+export function validateStep6(state: Pick<PublishStoreState, 'schedule'>): StepValidation {
+  const errors: string[] = [];
+  // Every day key must be present (the schema rejects missing keys).
+  for (const k of PUBLISH_DAY_KEYS) {
+    if (!Array.isArray(state.schedule[k])) {
+      errors.push(`Falta el horario de ${PUBLISH_DAY_LABELS[k]}`);
+    }
+  }
+  // At least one day must be open (have at least one window).
+  const anyOpen = PUBLISH_DAY_KEYS.some((k) => state.schedule[k]?.length > 0);
+  if (!anyOpen) {
+    errors.push('Al menos un día tiene que estar disponible');
+  }
+  return { valid: errors.length === 0, errors };
+}
+
+/** Max rules length (mirrors `chargerSchema.shape.rules` max). */
+export const PUBLISH_RULES_MAX = 300;
+
+/**
+ * Pure validation for step 7 (rules). Rules are optional per the
+ * spec — an empty string round-trips to `null` server-side. The
+ * length cap matches `chargerSchema.shape.rules.max`.
+ */
+export function validateStep7(state: Pick<PublishStoreState, 'rules'>): StepValidation {
+  const errors: string[] = [];
+  if (state.rules.length > PUBLISH_RULES_MAX) {
+    errors.push(`Máximo ${PUBLISH_RULES_MAX} caracteres`);
+  }
+  return { valid: errors.length === 0, errors };
+}
+
 /* ------------------------------------------------------------------ */
 /* Store                                                                */
 /* ------------------------------------------------------------------ */
@@ -209,6 +344,13 @@ const creator: StateCreator<PublishStoreState> = (set) => ({
   setConnectorType: (t) => set({ connector_type: t }),
   setPowerKw: (n) => set({ power_kw: n }),
   setPhotos: (uris) => set({ photos: uris }),
+  setPricePerHour: (n) =>
+    set((s) => ({ pricing: { ...s.pricing, price_per_hour_usd: n } })),
+  setMinReservation: (m) =>
+    set((s) => ({ pricing: { ...s.pricing, min_reservation_minutes: m } })),
+  setDaySchedule: (k, windows) =>
+    set((s) => ({ schedule: { ...s.schedule, [k]: windows } })),
+  setRules: (s) => set({ rules: s }),
   nextStep: () =>
     set((s) => ({
       step: Math.min(7, s.step + 1) as PublishStep,
@@ -228,7 +370,7 @@ const creator: StateCreator<PublishStoreState> = (set) => ({
 export const usePublishStore = create<PublishStoreState>()(
   persist(creator, {
     name: 'enchufate-publish-draft',
-    version: 1,
+    version: 2,
     storage: createJSONStorage(() => AsyncStorage),
     // Only persist the data fields — the actions are recreated on
     // every cold start. If we ever add a non-serializable field
@@ -241,6 +383,9 @@ export const usePublishStore = create<PublishStoreState>()(
       connector_type: s.connector_type,
       power_kw: s.power_kw,
       photos: s.photos,
+      pricing: s.pricing,
+      schedule: s.schedule,
+      rules: s.rules,
     }),
   }),
 );
