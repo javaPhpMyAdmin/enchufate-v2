@@ -39,7 +39,7 @@ export default function InicioTab() {
         <Text style={styles.wordmark}>Enchufate</Text>
       </View>
 
-      {/* Hero card: full-bleed car + charger photo (4:3 landscape, optimized JPG) */}
+      {/* Hero card: full-bleed car + charger photo (16:9 landscape, optimized JPG) */}
       <Card variant="elevated" padding="none" style={styles.heroCard}>
         <Image
           source={require('@/../assets/images/home_card.jpg')}
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
 
   // Hero card
   heroCard: { overflow: 'hidden', marginBottom: spacing.xs },
-  heroImage: { width: '100%', aspectRatio: 4 / 3, backgroundColor: colors.border },
+  heroImage: { width: '100%', aspectRatio: 16 / 9, backgroundColor: colors.border },
 
   // CTA cards (shared)
   ctaCard: { marginTop: spacing.xs },
