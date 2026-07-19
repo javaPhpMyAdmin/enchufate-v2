@@ -50,7 +50,7 @@ export default function InicioTab() {
       {/* Hero card: car + charger photo (16:9, user-provided PNG, cover) */}
       <Card variant="elevated" padding="none" style={styles.heroCard}>
         <Image
-          source={require('@/../assets/images/test.webp')}
+          source={require('@/../assets/images/home_card.png')}
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
           accessibilityLabel="Auto eléctrico enchufado a un cargador"
