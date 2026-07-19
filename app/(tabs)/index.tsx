@@ -28,13 +28,21 @@ export default function InicioTab() {
       style={styles.container}
       contentContainerStyle={[
         styles.content,
-        { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.xl },
+        {
+          paddingTop: insets.top + spacing.lg,
+          paddingBottom: insets.bottom + spacing.xl,
+        },
       ]}
     >
       {/* Header: brand mark + wordmark */}
       <View style={styles.header}>
         <View style={styles.brandMark}>
-          <Zap size={22} color={colors.success} fill={colors.success} strokeWidth={1.5} />
+          <Zap
+            size={22}
+            color={colors.success}
+            fill={colors.success}
+            strokeWidth={1.5}
+          />
         </View>
         <Text style={styles.wordmark}>Enchufate</Text>
       </View>
@@ -42,7 +50,7 @@ export default function InicioTab() {
       {/* Hero card: car + charger photo (16:9, user-provided PNG, cover) */}
       <Card variant="elevated" padding="none" style={styles.heroCard}>
         <Image
-          source={require('@/../assets/images/home_card.png')}
+          source={require('@/../assets/images/test.webp')}
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
           accessibilityLabel="Auto eléctrico enchufado a un cargador"
@@ -63,7 +71,9 @@ export default function InicioTab() {
           </View>
           <View style={styles.ctaText}>
             <Text style={styles.ctaTitle}>Buscar un cargador</Text>
-            <Text style={styles.ctaSubtitle}>Encontrá estaciones cerca de ti</Text>
+            <Text style={styles.ctaSubtitle}>
+              Encontrá estaciones cerca de ti
+            </Text>
           </View>
         </View>
       </Card>
@@ -82,7 +92,9 @@ export default function InicioTab() {
           </View>
           <View style={styles.ctaText}>
             <Text style={styles.ctaTitlePrimary}>Publicar mi cargador</Text>
-            <Text style={styles.ctaSubtitlePrimary}>Ganá dinero compartiendo tu punto</Text>
+            <Text style={styles.ctaSubtitlePrimary}>
+              Ganá dinero compartiendo tu punto
+            </Text>
           </View>
         </View>
       </Card>
@@ -128,7 +140,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heroSolidInner: { padding: spacing.base },
-  heroSolidText: { ...typography.title, color: colors.textOnPrimary, fontSize: 24 },
+  heroSolidText: {
+    ...typography.title,
+    color: colors.textOnPrimary,
+    fontSize: 24,
+  },
 
   // CTA cards (shared) — bumped up for more screen presence
   ctaCard: {
@@ -153,9 +169,24 @@ const styles = StyleSheet.create({
   ctaText: { flex: 1 },
 
   // CTA text variants
-  ctaTitle: { ...typography.title, color: colors.textPrimary, fontSize: 20, fontWeight: '700' },
-  ctaSubtitle: { ...typography.body, color: colors.textSecondary, marginTop: 4, fontSize: 15 },
-  ctaTitlePrimary: { ...typography.title, color: colors.textOnPrimary, fontSize: 20, fontWeight: '700' },
+  ctaTitle: {
+    ...typography.title,
+    color: colors.textPrimary,
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  ctaSubtitle: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: 4,
+    fontSize: 15,
+  },
+  ctaTitlePrimary: {
+    ...typography.title,
+    color: colors.textOnPrimary,
+    fontSize: 20,
+    fontWeight: '700',
+  },
   ctaSubtitlePrimary: {
     ...typography.body,
     color: colors.textOnPrimary,
