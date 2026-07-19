@@ -146,3 +146,134 @@ export function formatRelativeTime(iso: string): string {
   }
   return formatDateTime(iso).split(',')[0]?.trim() ?? iso;
 }
+
+/**
+ * Format an ISO timestamp as a long relative-time string with full
+ * Spanish words (no abbreviations). Same bucketing rules as
+ * `formatRelativeTime` but the output is meant for "wide" contexts:
+ * inbox tooltips, reservation detail meta, and any place where the
+ * text doesn't need to fit inside a 60px list-row trailing column.
+ *
+ * Output buckets (Rioplatense voseo):
+ *   - < 30s      → 'recién'
+ *   - < 60s      → 'hace un momento'
+ *   - < 60min    → 'hace N minutos' / 'hace 1 minuto'
+ *   - < 24h      → 'hace N horas'   / 'hace 1 hora'
+ *   - exactly 1d → 'ayer'
+ *   - < 7d       → 'hace N días'    / 'hace 1 día'
+ *   - otherwise  → '18 jul' (short date, no year)
+ *
+ * Future dates fall back to a short date the same way
+ * `formatRelativeTime` does.
+ */
+export function formatRelativeTimeLong(iso: string | Date): string {
+  const date = iso instanceof Date ? iso : new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return typeof iso === 'string' ? iso : '';
+  }
+  const now = Date.now();
+  const diffMs = date.getTime() - now;
+  const diffSec = Math.round(diffMs / 1000);
+
+  if (diffSec > 0) {
+    return formatDateTime(typeof iso === 'string' ? iso : iso.toISOString())
+      .split(',')[0]
+      ?.trim() ?? '';
+  }
+  const pastSec = Math.abs(diffSec);
+  if (pastSec < 30) return 'recién';
+  if (pastSec < 60) return 'hace un momento';
+
+  const rtf = new Intl.RelativeTimeFormat('es-UY', { numeric: 'always' });
+
+  if (pastSec < 3600) {
+    const m = Math.round(pastSec / 60);
+    return rtf.format(-m, 'minute');
+  }
+  if (pastSec < 86400) {
+    const h = Math.round(pastSec / 3600);
+    return rtf.format(-h, 'hour');
+  }
+  if (pastSec < 86400 * 7) {
+    const d = Math.round(pastSec / 86400);
+    if (d === 1) return 'ayer';
+    return rtf.format(-d, 'day');
+  }
+  return formatDateTime(typeof iso === 'string' ? iso : iso.toISOString())
+    .split(',')[0]
+    ?.trim() ?? '';
+}
+
+/**
+ * Format a date range for reservation cards and inbox previews.
+ *
+ * Behaviour:
+ *   - **Same day**: `18 jul, 14:30 — 16:00` (date once, both times)
+ *   - **Different days, same month**: `18 jul — 20 jul` (no times when
+ *     the range crosses midnight; the spec treats the all-day block
+ *     as a span)
+ *   - **Different months**: `18 jul — 2 ago` (no year)
+ *   - **Different years**: `28 dic 2025 — 2 ene 2026` (year appended)
+ *
+ * Strings `start` and `end` accept either an ISO string or a `Date`.
+ * Missing / invalid input returns an empty string (callers fall back
+ * to a free-form label).
+ */
+export function formatDateRange(
+  start: string | Date,
+  end: string | Date,
+): string {
+  const s = start instanceof Date ? start : new Date(start);
+  const e = end instanceof Date ? end : new Date(end);
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) {
+    return '';
+  }
+  const sameDay =
+    s.getFullYear() === e.getFullYear() &&
+    s.getMonth() === e.getMonth() &&
+    s.getDate() === e.getDate();
+
+  const dateFmt = new Intl.DateTimeFormat('es-UY', {
+    day: 'numeric',
+    month: 'short',
+  })
+    .format(s)
+    .replace(/\u00a0/g, ' ')
+    .replace(/\.$/, '');
+
+  if (sameDay) {
+    const timeFmt = new Intl.DateTimeFormat('es-UY', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    return `${dateFmt}, ${timeFmt.format(s)} — ${timeFmt.format(e)}`;
+  }
+
+  const endDateFmt = new Intl.DateTimeFormat('es-UY', {
+    day: 'numeric',
+    month: 'short',
+  })
+    .format(e)
+    .replace(/\u00a0/g, ' ')
+    .replace(/\.$/, '');
+  const sameMonth = s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
+  if (sameMonth) {
+    return `${dateFmt} — ${endDateFmt}`;
+  }
+  const sameYear = s.getFullYear() === e.getFullYear();
+  if (sameYear) {
+    return `${dateFmt} — ${endDateFmt}`;
+  }
+  // Different years — append the year to both ends.
+  const longFmt = (d: Date): string =>
+    new Intl.DateTimeFormat('es-UY', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
+      .format(d)
+      .replace(/\u00a0/g, ' ')
+      .replace(/\.$/, '');
+  return `${longFmt(s)} — ${longFmt(e)}`;
+}

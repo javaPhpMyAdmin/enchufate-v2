@@ -1,7 +1,7 @@
 /**
  * Publish wizard layout — `/publish/*`.
  *
- * Three concerns in this layout:
+ * Four concerns in this layout:
  *   1. **Auth gate** — every publish screen is auth-required. The
  *      layout reads `useSession()`; if there's no session and the
  *      initial hydration has finished, we redirect to
@@ -16,15 +16,17 @@
  *   3. **Pinned chrome** — the `BetaBanner` lives at the top and
  *      the `PublishWizardNav` lives at the bottom of every step.
  *      The screen renders only the form content in between.
- *
- * PR-B ships steps 1 and 2. Tapping "Siguiente" on step 2 calls
- * `nextStep()` which sets `step = 3`; the layout's useEffect then
- * navigates to `/publish/3-connector`, which is a 404 in PR-B. PR-C
- * adds that route. The intermediate 404 is expected and is the
- * reviewable unit boundary.
+ *   4. **Exit guard** (Phase 8 polish) — a hardware back press
+ *      while the wizard has unsaved data (any non-default field
+ *      populated) pops an `Alert.alert` confirmation. The user
+ *      can either "Seguir publicando" (cancel) or "Salir" which
+ *      calls `publishStore.resetWizard()` and replaces the
+ *      stack with `/(tabs)`. The OS-level back button is the
+ *      only reliable hook here; the iOS swipe-back gesture is
+ *      a known limitation that's documented in the spec.
  */
 import { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, BackHandler, StyleSheet, View } from 'react-native';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -45,6 +47,27 @@ const STEP_ROUTE: Record<PublishStep, string> = {
   7: '/publish/7-rules',
 };
 
+/**
+ * Pure check: does the wizard have any user-typed data worth
+ * protecting? The `name` / `description` / `address` / `rules`
+ * strings and the `photos` array are the load-bearing fields;
+ * `step` itself is irrelevant (a user starting fresh is on
+ * step 1 with empty data and gets a free exit).
+ */
+function hasUnsavedChanges(s: ReturnType<typeof usePublishStore.getState>): boolean {
+  if (s.name.trim().length > 0) return true;
+  if (s.description.trim().length > 0) return true;
+  if (s.location && (s.location.address.trim().length > 0 || s.location.lat !== null)) {
+    return true;
+  }
+  if (s.connector_type !== null) return true;
+  if (s.power_kw !== null) return true;
+  if (s.photos.length > 0) return true;
+  if (s.pricing.price_per_hour_usd !== null) return true;
+  if (s.rules.trim().length > 0) return true;
+  return false;
+}
+
 export default function PublishLayout() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -52,6 +75,7 @@ export default function PublishLayout() {
   const { session, isLoading } = useSession();
   const step = usePublishStore((s) => s.step);
   const setStep = usePublishStore((s) => s.setStep);
+  const resetWizard = usePublishStore((s) => s.resetWizard);
 
   // ----- Auth gate -----
   // Redirect to login as soon as we know the user is logged out.
@@ -84,6 +108,41 @@ export default function PublishLayout() {
       router.replace(expected as never);
     }
   }, [pathname, step, setStep, router]);
+
+  // ----- Exit guard (Phase 8 polish) -----
+  // Hardware back press on Android (and on iOS hardware-keyboard
+  // devices) — show an alert if the user has unsaved data. The
+  // iOS swipe-back gesture is not intercepted here (Expo Router
+  // does not expose a `beforeRemove` API as of SDK 54); the
+  // back button is the reliable hook for the MVP.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      const state = usePublishStore.getState();
+      if (!hasUnsavedChanges(state)) {
+        // Clean exit — no alert, let the OS navigate.
+        return false;
+      }
+      Alert.alert(
+        'Tenés cambios sin guardar',
+        'Si salís ahora vas a perder el cargador que estás publicando.',
+        [
+          { text: 'Seguir publicando', style: 'cancel' },
+          {
+            text: 'Salir',
+            style: 'destructive',
+            onPress: () => {
+              state.resetWizard();
+              router.replace('/(tabs)' as never);
+            },
+          },
+        ],
+        { cancelable: true },
+      );
+      // Consume the event so the OS does not also navigate back.
+      return true;
+    });
+    return () => sub.remove();
+  }, [router, resetWizard]);
 
   if (isLoading || !session) {
     return (

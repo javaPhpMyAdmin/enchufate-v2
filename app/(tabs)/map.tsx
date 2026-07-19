@@ -22,7 +22,7 @@
  * — see `openspec/specs/map/spec.md` non-functional notes).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   Camera,
   Map as MapView,
@@ -50,6 +50,7 @@ import { FAB } from '@/components/atoms/FAB';
 import { Icon } from '@/components/atoms/Icon';
 import { LoadingState } from '@/components/molecules/LoadingState';
 import { ErrorState } from '@/components/molecules/ErrorState';
+import { PermissionToast } from '@/components/molecules/PermissionToast';
 import { FiltersSheet } from '@/components/organisms/FiltersSheet';
 import { colors, radius, spacing, typography } from '@/theme';
 import type { Charger } from '@/features/chargers/types';
@@ -102,15 +103,20 @@ export default function MapTab() {
   const cameraRef = useRef<CameraRef>(null);
   const sourceRef = useRef<GeoJSONSourceRef>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [showLocationToast, setShowLocationToast] = useState(false);
   const router = useRouter();
 
   // Request location permission on first mount (Phase 4 spec).
-  // A denied permission is non-fatal — the FAB falls back to Uruguay.
+  // A denied permission is non-fatal — the FAB falls back to
+  // Uruguay. Phase 8 swaps the previous console.warn for a
+  // PermissionToast banner with a CTA that opens iOS / Android
+  // Settings so the user can flip the toggle without leaving the
+  // app first.
   useEffect(() => {
-    requestLocationPermission().catch(() => {
-      // Phase 8 will replace this with a toast. For now, console only.
-      // eslint-disable-next-line no-console
-      console.warn('[Mapa] Activá la ubicación para centrar el mapa');
+    requestLocationPermission().then((result) => {
+      if (result !== 'granted') {
+        setShowLocationToast(true);
+      }
     });
   }, []);
 
@@ -279,6 +285,17 @@ export default function MapTab() {
       />
 
       <FiltersSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} />
+
+      <PermissionToast
+        visible={showLocationToast}
+        onDismiss={() => setShowLocationToast(false)}
+        message="Necesitamos tu ubicación para mostrar cargadores cerca tuyo."
+        ctaLabel="Activar"
+        onCtaPress={() => {
+          setShowLocationToast(false);
+          void Linking.openSettings();
+        }}
+      />
     </View>
   );
 }
