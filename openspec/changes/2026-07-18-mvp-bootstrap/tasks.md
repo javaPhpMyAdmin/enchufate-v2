@@ -447,6 +447,7 @@ Phase 1 (Foundation)
   - `useMyChargers()` returns chargers where `owner_id = auth.uid()` with `staleTime: 30_000`.
   - Both expose `{ data, isLoading, error }` and return typed `Profile` / `Charger` shapes.
 - **Commit strategy**: 1 commit — `feat(profile): add useProfile and useMyChargers hooks`.
+- **Status (apply-phase-5, 2026-07-19)**: ✅ Complete (mock data path; real Supabase swap lands in Phase 6). `src/features/profile/types.ts` (28 lines, `Profile` interface mirroring the `public.profiles` schema), `hooks/useProfile.ts` (62 lines, `staleTime: 60_000`, gated on `userId`, throws a typed `AppError` if called without one), `hooks/useMyChargers.ts` (52 lines, `staleTime: 30_000`, same gating), and `data/mockMyChargers.ts` (94 lines, 3 chargers owned by `mock-uid` covering `active`/`paused` × Tipo 2/CCS for visual coverage). Mocks mirror the SQL schema byte-for-byte so the Phase 6 swap to `.from('chargers').select().eq('owner_id', uid)` is zero call-site changes. Committed as part of the Phase 5 PR-A work-unit commits.
 
 ### Task 5.2: Profile screen (both states) + sign-out wiring
 
@@ -459,6 +460,7 @@ Phase 1 (Foundation)
   - Tapping "Cerrar sesión" calls `useSignOut`; the screen re-renders the empty state.
   - 0 chargers renders the "Todavía no publicaste cargadores" hint.
 - **Commit strategy**: 1 commit — `feat(profile): add logged-out and authenticated profile states`.
+- **Status (apply-phase-5, 2026-07-19)**: ✅ Complete. `app/(tabs)/profile.tsx` (~360 lines, replaces the 27-line Phase 4 stub). Branches on `useSession()`: while `isLoading` shows `LoadingState`; when no session shows a guest `EmptyState` with the spec-required "CE" initials avatar placeholder, "Bienvenido" title, body copy, full-width "Iniciá sesión" primary Button, and a "Creá tu cuenta" link (added per the user-prompt brief which asked for "Login/Signup CTAs"; deviation from the spec which only required one button — matches the existing login/signup screen pattern). When signed in shows the full profile: avatar (Avatar atom with `name` fallback for initials), display name, email, "Miembro desde {month} de {year}" (formatted via `Intl.DateTimeFormat('es-UY', { month: 'long', year: 'numeric' })` to match the spec scenario), 3 stat cards (Rating `0.0`, Reseñas `0`, Cargadores live count), "Mis cargadores" section with a "Publicar nuevo" pill (navigates to `/publish/1-name`), a list of `ChargerCard` rows each with a disabled ghost 3-dot Button (edit/delete is v2.1), the "Todavía no publicaste cargadores" hint when 0 chargers, and a "Cerrar sesión" secondary Button that calls `useSignOut`. Committed as part of the Phase 5 PR-A work-unit commits.
 
 > **Phase 5 PR-A**: tasks 5.1 + 5.2. ~240 lines. Well under 800.
 
