@@ -11,11 +11,11 @@
  * `staleTime: 5 * 60_000` per `design.md §4.3` stay identical so
  * the screen does not change when the real `queryFn` lands.
  *
- * Validation note: the returned object is typed as `ChargerWithHost`
- * via TypeScript. The Zod `chargerSchema` is wired in a follow-up
- * commit (Phase 6 PR-A commit 3 — the schemas) and parses the
- * mock on read so a bad fixture surfaces immediately rather than
- * blowing up the screen render.
+ * The mock is parsed through `chargerSchema` on read so a bad
+ * fixture surfaces as a typed `AppError` immediately rather than
+ * blowing up the screen render. The `parse` is in a `try` so a
+ * schema mismatch still throws an `AppError` (not a Zod error) —
+ * the screen reads `error.userMessage` for the user-facing copy.
  *
  * Throws an `AppError` with `code: 'not_found'` when the charger
  * doesn't exist so the screen can render its "Cargador no
@@ -25,6 +25,7 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import { AppError } from '@/lib/error';
+import { chargerSchema } from '@/lib/schemas/charger';
 
 import { MOCK_CHARGERS } from '../data/mockChargers';
 import { MOCK_HOSTS, type MockHost } from '../data/mockHosts';
@@ -86,12 +87,27 @@ export function useCharger(
       // Simulate network latency so the LoadingState is visible
       // when navigating from a list / map pin.
       await new Promise((r) => setTimeout(r, 200));
-      const charger = MOCK_CHARGERS.find((c) => c.id === id);
-      if (!charger) {
+      const raw = MOCK_CHARGERS.find((c) => c.id === id);
+      if (!raw) {
         throw new AppError({
           code: 'not_found',
           message: `Charger ${id} not found`,
           userMessage: 'No encontramos este cargador.',
+          retryable: false,
+        });
+      }
+      // Validate on read so a bad fixture surfaces immediately
+      // (e.g. a power_kw out of range, an empty title). The
+      // try/catch converts a Zod error into a typed AppError that
+      // the screen renders through `<ErrorState />`.
+      let charger: Charger;
+      try {
+        charger = chargerSchema.parse(raw);
+      } catch (zodErr) {
+        throw new AppError({
+          code: 'schema_mismatch',
+          message: zodErr instanceof Error ? zodErr.message : 'chargerSchema.parse failed',
+          userMessage: 'No pudimos cargar este cargador. Intentá de nuevo.',
           retryable: false,
         });
       }
