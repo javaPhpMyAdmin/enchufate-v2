@@ -24,7 +24,7 @@
  * selector syntax is not supported by the current hook signature;
  * documented as a small deviation.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Dimensions,
@@ -38,14 +38,6 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
-  Camera as MapCamera,
-  Map as MapView,
-  GeoJSONSource,
-  Images,
-  Layer,
-} from '@maplibre/maplibre-react-native';
-import {
-  ArrowUpRight,
   Calendar,
   ChevronLeft,
   MapPin,
@@ -68,8 +60,11 @@ import { CONNECTOR_LABEL } from '@/features/chargers/types';
 import { formatPrice } from '@/lib/format';
 import { colors, radius, spacing, typography } from '@/theme';
 
-const OPENFREEMAP_LIBERTY = 'https://tiles.openfreemap.org/styles/liberty';
-const CARGADOR_SNIPPET_ICON = 'cargador-snippet';
+// ── Lazy-loaded map snippet (avoids TurboModule crash post-OAuth)
+const ChargerMapSnippet = React.lazy(
+  () => import('@/components/organisms/ChargerMapSnippet'),
+);
+
 const PLACEHOLDER_PHOTO = require('@/../assets/icons/cargador.png');
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -83,6 +78,14 @@ export default function ChargerDetailScreen() {
   const charger = useCharger(chargerId);
   const sheetRef = useRef<BottomSheetModal>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [mounted, setMounted] = useState(false);
+
+  // Mount guard: defer ChargerMapSnippet until after the first render cycle.
+  // Prevents MLRNCameraModule crash on post-OAuth redirect.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   const onOpenInMaps = useCallback(() => {
     const data = charger.data;
@@ -142,23 +145,10 @@ export default function ChargerDetailScreen() {
   const c = charger.data;
   const photos = c.photos.length > 0 ? c.photos : [null];
   const total = photos.length;
-  // Inline Intl for "marzo de 2024" — formatDateTime in
-  // `src/lib/format` produces "18 jul, 14:30" (short day + time),
-  // not the month + year the spec requires.
   const memberSince = new Intl.DateTimeFormat('es-UY', {
     month: 'long',
     year: 'numeric',
   }).format(new Date(c.host.createdAt));
-  const snippetGeoJson = {
-    type: 'FeatureCollection' as const,
-    features: [
-      {
-        type: 'Feature' as const,
-        geometry: { type: 'Point' as const, coordinates: [c.lng, c.lat] },
-        properties: { id: c.id },
-      },
-    ],
-  };
 
   return (
     <View style={styles.flex}>
@@ -221,39 +211,18 @@ export default function ChargerDetailScreen() {
         </Card>
 
         {/* Map snippet */}
-        <Pressable
-          onPress={onOpenInMaps}
-          accessibilityRole="link"
-          accessibilityLabel="Ver en el mapa"
-          style={styles.mapWrap}
-        >
-          <MapView
-            style={StyleSheet.absoluteFill}
-            mapStyle={OPENFREEMAP_LIBERTY}
-            logo={false}
-            attribution={false}
-            pointerEvents="none"
-          >
-            <MapCamera center={[c.lng, c.lat]} zoom={14} />
-            <Images images={{ [CARGADOR_SNIPPET_ICON]: require('@/../assets/icons/cargador.png') }} />
-            <GeoJSONSource data={snippetGeoJson}>
-              <Layer
-                id="snippet-pin"
-                type="symbol"
-                layout={{
-                  'icon-image': CARGADOR_SNIPPET_ICON,
-                  'icon-size': 0.12,
-                  'icon-anchor': 'bottom',
-                  'icon-allow-overlap': true,
-                }}
-              />
-            </GeoJSONSource>
-          </MapView>
-          <View style={styles.mapOverlay} pointerEvents="none">
-            <Text style={styles.mapOverlayText}>Ver en Google Maps</Text>
-            <Icon icon={ArrowUpRight} size="sm" color={colors.textOnPrimary} />
-          </View>
-        </Pressable>
+        {mounted ? (
+          <React.Suspense fallback={<View style={styles.mapWrap} />}>
+            <ChargerMapSnippet
+              lng={c.lng}
+              lat={c.lat}
+              id={c.id}
+              onPress={onOpenInMaps}
+            />
+          </React.Suspense>
+        ) : (
+          <View style={styles.mapWrap} />
+        )}
 
         {/* Host */}
         <Card variant="default" padding="md" style={styles.card}>
@@ -418,19 +387,6 @@ const styles = StyleSheet.create({
   priceSuffix: { ...typography.body, color: colors.textSecondary, fontWeight: '400' },
 
   mapWrap: { height: 160, borderRadius: radius.card, overflow: 'hidden', backgroundColor: colors.surface },
-  mapOverlay: {
-    position: 'absolute',
-    bottom: spacing.sm,
-    right: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.pill,
-  },
-  mapOverlayText: { ...typography.caption, color: colors.textOnPrimary, fontWeight: '600' },
 
   hostRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   hostText: { flex: 1, gap: 2 },

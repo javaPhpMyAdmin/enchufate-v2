@@ -39,45 +39,10 @@ const INITIAL_CAMERA = {
   zoom: URUGUAY_FALLBACK.zoom,
 } as const;
 
-// ── Public types (re-exported for parent) ────────────────────
-export type { CameraRef, GeoJSONSourceRef, PressEventWithFeatures };
-
-// ── GeoJSON helper ───────────────────────────────────────────
-import type { Feature, FeatureCollection, Point } from 'geojson';
-import type { Charger } from '@/features/chargers/types';
-
-interface ChargerFeatureProps {
-  id: string;
-  title: string;
-  connector_type: Charger['connector_type'];
-  power_kw: number;
-  status: Charger['status'];
-  cluster?: boolean;
-  cluster_id?: number;
-  point_count?: number;
-}
-
-type ChargerFeature = Feature<Point, ChargerFeatureProps>;
-export type ChargerFC = FeatureCollection<Point, ChargerFeatureProps>;
-
-export function chargersToGeoJSON(chargers: Charger[]): ChargerFC {
-  return {
-    type: 'FeatureCollection',
-    features: chargers.map(
-      (c): ChargerFeature => ({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [c.lng, c.lat] },
-        properties: {
-          id: c.id,
-          title: c.title,
-          connector_type: c.connector_type,
-          power_kw: c.power_kw,
-          status: c.status,
-        },
-      }),
-    ),
-  };
-}
+// ── GeoJSON type ─────────────────────────────────────────────
+// Matches the parent's ChargerFC so there's no cross-module type
+// mismatch. MapLibre accepts FeatureCollection at runtime.
+export type ChargerFC = import('geojson').FeatureCollection<import('geojson').Point>;
 
 // ── Props ────────────────────────────────────────────────────
 export interface MapContentProps {

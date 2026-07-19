@@ -9,6 +9,12 @@
  * code (logger, network interceptors) can read the session via
  * `getCurrentUser()`.
  *
+ * **OAuth deep-link handler**: On Android, the OAuth redirect
+ * (`enchufate:///(tabs)?code=...`) restarts the app. We detect the
+ * initial URL on boot, extract the PKCE code or implicit tokens,
+ * and create the session before `getSession()` runs. This ensures
+ * the redirect doesn't silently drop the auth.
+ *
  * Returns the same shape regardless of whether the session is being
  * loaded for the first time or was already in memory: `{ session,
  * user, isLoading }`. `isLoading` is `true` only during the initial
@@ -16,6 +22,7 @@
  * and the value never flips back to `true`.
  */
 import { useEffect, useState } from 'react';
+import * as Linking from 'expo-linking';
 
 import { supabase } from '@/lib/supabase';
 
@@ -23,6 +30,45 @@ import { useAuthStore } from '../stores/authStore';
 import type { AuthState } from '../types';
 
 const INITIAL: AuthState = { session: null, user: null, isLoading: true };
+
+/**
+ * Check if the app was opened via an OAuth deep link and create the
+ * session. Returns after processing (or immediately if no auth URL).
+ */
+async function handleOAuthDeepLink(): Promise<void> {
+  let url: string | null;
+  try {
+    url = await Linking.getInitialURL();
+  } catch {
+    return; // No initial URL — normal cold start
+  }
+  if (!url) return;
+
+  try {
+    const parsed = new URL(url);
+
+    // --- PKCE flow: ?code=... ---
+    const code = parsed.searchParams.get('code');
+    if (code) {
+      await supabase.auth.exchangeCodeForSession(code);
+      return;
+    }
+
+    // --- Implicit flow: #access_token=...&refresh_token=... ---
+    const hash = parsed.hash.startsWith('#') ? parsed.hash.slice(1) : parsed.hash;
+    const params = new URLSearchParams(hash);
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    if (accessToken && refreshToken) {
+      await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+    }
+  } catch {
+    // Not a valid URL or other parsing error — fall through to getSession
+  }
+}
 
 /** Read the current session and listen for auth changes. */
 export function useSession(): AuthState {
@@ -32,17 +78,23 @@ export function useSession(): AuthState {
   useEffect(() => {
     let mounted = true;
 
-    // Restore existing session on cold start. Supabase reads the
-    // token from `secureStorage` (iOS Keychain / Android Encrypted-
-    // SharedPreferences) and verifies it server-side. If verification
-    // fails, `session` is `null` and we stay logged-out.
-    void supabase.auth
-      .getSession()
-      .then(({ data }) => {
+    // 1. Handle OAuth deep link FIRST (Android restart case).
+    //    This creates the session from the redirect URL before we
+    //    call getSession(), so the session is already there.
+    // 2. Then restore any existing session (cold start / warm boot).
+    // 3. Then subscribe to live changes.
+    void handleOAuthDeepLink()
+      .catch(() => {}) // best-effort — if it fails, we fall through to getSession
+      .then(() => {
         if (!mounted) return;
-        const session = data.session;
-        setSession(session);
-        setState({ session, user: session?.user ?? null, isLoading: false });
+        return supabase.auth
+          .getSession()
+          .then(({ data }) => {
+            if (!mounted) return;
+            const session = data.session;
+            setSession(session);
+            setState({ session, user: session?.user ?? null, isLoading: false });
+          });
       })
       .catch(() => {
         if (!mounted) return;

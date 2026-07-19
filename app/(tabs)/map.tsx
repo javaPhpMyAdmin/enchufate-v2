@@ -2,32 +2,19 @@
  * Mapa tab — public charger discovery surface (Phase 4).
  *
  * Renders a MapLibre view tiled from OpenFreeMap (no tokens required)
- * centered on Uruguay, with native clustering of charger pins
- * (`cluster: true` on the GeoJSONSource, `clusterMaxZoom: 14`).
+ * centered on Uruguay, with native clustering of charger pins.
  *
- * **Lazy loading**: The MapLibre-dependent `MapContent` component is
- * loaded via `React.lazy` to defer TurboModule resolution. This
- * prevents the `MLRNCameraModule could not be found` crash that
- * occurs when the app returns from Google OAuth (the bridge isn't
- * fully ready when the native module is synchronously accessed).
- *
- * The Filtros pill and PermissionToast stay here — they don't
- * depend on MapLibre.
+ * **Mount guard**: MapContent (which imports MapLibre's TurboModules)
+ * is deferred via a `mounted` flag that flips in `useEffect`. This
+ * gives the native bridge time to re-initialize after an OAuth
+ * redirect callback, preventing the `MLRNCameraModule` invariant
+ * violation.
  */
-import React, {
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
-import { Linking, Pressable, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Linking, StyleSheet, View } from 'react-native';
 import type { NativeSyntheticEvent } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { RefreshCw } from 'lucide-react-native';
 
 import { useChargers } from '@/features/chargers/hooks/useChargers';
 import { useFilterStore } from '@/stores/filterStore';
@@ -40,48 +27,37 @@ import { LoadingState } from '@/components/molecules/LoadingState';
 import { ErrorState } from '@/components/molecules/ErrorState';
 import { PermissionToast } from '@/components/molecules/PermissionToast';
 import { FiltersSheet } from '@/components/organisms/FiltersSheet';
-import { Icon } from '@/components/atoms/Icon';
-import { colors, radius, spacing, typography } from '@/theme';
+import { colors, spacing } from '@/theme';
+import type { Charger } from '@/features/chargers/types';
+import type { PressEventWithFeatures } from '@maplibre/maplibre-react-native';
 
-// ── Lazy import ──────────────────────────────────────────────
-// React.lazy defers the native module resolution to after the
-// first render cycle. This is the fix for the OAuth redirect crash.
-import type {
-  CameraRef,
-  GeoJSONSourceRef,
-  PressEventWithFeatures,
-  ChargerFC,
-} from './MapContent';
-import { chargersToGeoJSON } from './MapContent';
+// ── Lazy import (deferred until first render tick) ───────────
+// React.lazy is NOT sufficient on its own because Metro bundles
+// everything into a single file. The actual fix is the `mounted`
+// flag in useEffect below, which delays mounting MapContent until
+// after the first render cycle completes.
+const MapContent = React.lazy(
+  () => import('@/components/organisms/MapContent'),
+);
 
-const MapContent = React.lazy(() => import('./MapContent'));
+// ── GeoJSON helpers (no MapLibre dependency) ─────────────────
+type GeoJSONFeature = GeoJSON.Feature<GeoJSON.Point>;
 
-// ── Error boundary for lazy import failure ────────────────────
-interface LazyErrorBoundaryProps {
-  children: ReactNode;
-  fallback: ReactNode;
-}
-
-interface LazyErrorBoundaryState {
-  hasError: boolean;
-}
-
-class LazyErrorBoundary extends React.Component<
-  LazyErrorBoundaryProps,
-  LazyErrorBoundaryState
-> {
-  override state: LazyErrorBoundaryState = { hasError: false };
-
-  static getDerivedStateFromError(): LazyErrorBoundaryState {
-    return { hasError: true };
-  }
-
-  override render() {
-    if (this.state.hasError) {
-      return this.props.fallback;
-    }
-    return this.props.children;
-  }
+function chargersToGeoJSON(chargers: Charger[]): GeoJSON.FeatureCollection<GeoJSON.Point> {
+  return {
+    type: 'FeatureCollection',
+    features: chargers.map((c): GeoJSONFeature => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [c.lng, c.lat] },
+      properties: {
+        id: c.id,
+        title: c.title,
+        connector_type: c.connector_type,
+        power_kw: c.power_kw,
+        status: c.status,
+      },
+    })),
+  };
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -89,12 +65,20 @@ export default function MapTab() {
   const insets = useSafeAreaInsets();
   const filters = useFilterStore((s) => s.filters);
   const { data, isLoading, error, refetch } = useChargers(filters);
-  const cameraRef = useRef<CameraRef>(null);
-  const sourceRef = useRef<GeoJSONSourceRef>(null);
+  const cameraRef = useRef<any>(null);
+  const sourceRef = useRef<any>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [showLocationToast, setShowLocationToast] = useState(false);
-  const [lazyFailed, setLazyFailed] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+
+  // Mount guard: defer MapContent until after the first render cycle.
+  // This is critical for the post-OAuth redirect scenario where
+  // TurboModules haven't re-registered yet.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   // Request location permission on first mount (Phase 4 spec).
   useEffect(() => {
@@ -105,7 +89,7 @@ export default function MapTab() {
     });
   }, []);
 
-  const geojson = useMemo<ChargerFC | null>(
+  const geojson = useMemo(
     () => (data ? chargersToGeoJSON(data) : null),
     [data],
   );
@@ -154,71 +138,25 @@ export default function MapTab() {
     );
   }
 
-  // ── Lazy import failure fallback ──────────────────────────
-  if (lazyFailed) {
-    return (
-      <View style={fallbackStyles.base}>
-        <Icon icon={RefreshCw} size="lg" color={colors.textSecondary} />
-        <Text style={fallbackStyles.title}>No se pudo cargar el mapa</Text>
-        <Text style={fallbackStyles.body}>
-          Ocurrió un error al inicializar el mapa. Probá de nuevo.
-        </Text>
-        <Pressable
-          onPress={() => {
-            setLazyFailed(false);
-            // Force a tick so the lazy component unmounts then remounts
-            requestAnimationFrame(() => setLazyFailed(false));
-          }}
-          style={({ pressed }) => [
-            fallbackStyles.button,
-            pressed && fallbackStyles.buttonPressed,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Reintentar carga del mapa"
-        >
-          <Text style={fallbackStyles.buttonLabel}>Reintentar</Text>
-        </Pressable>
-      </View>
-    );
+  // ── Mount guard: show nothing until the bridge is ready ───
+  if (!mounted) {
+    return <LoadingState label="Cargando mapa..." />;
   }
 
   // ── Main render ───────────────────────────────────────────
   return (
-    <View style={{ flex: 1 }}>
-      <LazyErrorBoundary
-        fallback={
-          <View style={fallbackStyles.base}>
-            <Icon icon={RefreshCw} size="lg" color={colors.textSecondary} />
-            <Text style={fallbackStyles.title}>No se pudo cargar el mapa</Text>
-            <Text style={fallbackStyles.body}>
-              Ocurrió un error al inicializar el mapa. Probá de nuevo.
-            </Text>
-            <Pressable
-              onPress={() => setLazyFailed(true)}
-              style={({ pressed }) => [
-                fallbackStyles.button,
-                pressed && fallbackStyles.buttonPressed,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Reintentar carga del mapa"
-            >
-              <Text style={fallbackStyles.buttonLabel}>Reintentar</Text>
-            </Pressable>
-          </View>
-        }
-      >
-        <Suspense fallback={<LoadingState label="Cargando mapa..." />}>
-          <MapContent
-            geojson={geojson}
-            onRecenter={handleRecenter}
-            onSourcePress={handleSourcePress}
-            insets={insets}
-            onFilterPress={() => setSheetOpen(true)}
-            cameraRef={cameraRef}
-            sourceRef={sourceRef}
-          />
-        </Suspense>
-      </LazyErrorBoundary>
+    <View style={styles.root}>
+      <React.Suspense fallback={<LoadingState label="Cargando mapa..." />}>
+        <MapContent
+          geojson={geojson}
+          onRecenter={handleRecenter}
+          onSourcePress={handleSourcePress}
+          insets={insets}
+          onFilterPress={() => setSheetOpen(true)}
+          cameraRef={cameraRef}
+          sourceRef={sourceRef}
+        />
+      </React.Suspense>
 
       <FiltersSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} />
 
@@ -236,38 +174,6 @@ export default function MapTab() {
   );
 }
 
-// ── Lazy import error fallback styles ────────────────────────
-const fallbackStyles = {
-  base: {
-    flex: 1,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.xl,
-  },
-  title: {
-    ...typography.body,
-    color: colors.textPrimary,
-    fontWeight: '600' as const,
-    marginTop: spacing.base,
-  },
-  body: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center' as const,
-    marginTop: spacing.xs,
-  },
-  button: {
-    marginTop: spacing.lg,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.primary,
-    borderRadius: radius.button,
-  },
-  buttonPressed: { opacity: 0.85 },
-  buttonLabel: {
-    ...typography.body,
-    color: colors.textOnPrimary,
-    fontWeight: '600' as const,
-  },
-};
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.background },
+});

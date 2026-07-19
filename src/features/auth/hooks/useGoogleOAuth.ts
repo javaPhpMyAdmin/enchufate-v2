@@ -14,11 +14,17 @@
  *   2. We open that URL in `expo-web-browser.openAuthSessionAsync`
  *      with the deep-link `redirectTo` so the OS bounces the user
  *      back into the app after they authenticate.
- *   3. On success, Supabase has already written the session to
- *      secure storage and `onAuthStateChange` fired — the user
- *      lands on the originating tab without us navigating.
+ *   3. On success, we parse the redirect URL for either a PKCE code
+ *      (?code=...) or implicit tokens (#access_token=...&refresh_token=...)
+ *      and create the session. This triggers `onAuthStateChange` so
+ *      the login screen's useEffect redirects to /(tabs).
  *   4. On user cancel (dismissed the Google picker), we surface
  *      a silent no-op so the screen returns to its idle state.
+ *
+ * **Android note**: The deep-link redirect may restart the app
+ * instead of returning to `openAuthSessionAsync`. In that case the
+ * promise never resolves — the session is created by the boot-time
+ * deep-link handler in `useSession.ts` instead.
  */
 import { useMutation } from '@tanstack/react-query';
 import * as Linking from 'expo-linking';
@@ -73,21 +79,15 @@ export function useGoogleOAuth(): UseGoogleOAuthResult {
 
       // `openAuthSessionAsync` blocks until the user dismisses the
       // browser, completes the OAuth flow, or the deep link fires
-      // back into the app. The `result` only tells us the user
-      // cancelled — a successful auth arrives via the auth-state
-      // listener before this promise resolves, so we don't need to
-      // parse a `result.url`.
+      // back into the app. On Android the deep link may restart the
+      // app, so this promise may never resolve — that's fine because
+      // `useSession` handles the redirect URL on boot.
       const result = await WebBrowser.openAuthSessionAsync(
         data.url,
         redirectTo,
       );
 
       if (result.type === 'cancel' || result.type === 'dismiss') {
-        // User dismissed the Google account picker. Spec says
-        // "return to login with no error" — we throw a non-retryable
-        // error that the screen can swallow (or render as a soft
-        // "cancelaste el inicio de sesión" hint). v2.1 will likely
-        // differentiate by status.
         throw new AppError({
           code: 'oauth_cancelled',
           message: 'User cancelled the Google OAuth flow',
@@ -95,6 +95,40 @@ export function useGoogleOAuth(): UseGoogleOAuthResult {
           isAuthError: false,
           retryable: false,
         });
+      }
+
+      if (result.type === 'success') {
+        // The redirect URL carries auth data in one of two formats:
+        //   PKCE:  ?code=<authorization_code>  → exchange for session
+        //   Implicit: #access_token=...&refresh_token=... → set directly
+        // We handle both because Supabase may be configured for either.
+        const url = new URL(result.url);
+
+        // --- PKCE flow ---
+        const code = url.searchParams.get('code');
+        if (code) {
+          const { error: exchangeError } =
+            await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeError) throw normalizeSupabaseError(exchangeError);
+          return;
+        }
+
+        // --- Implicit flow (hash fragment) ---
+        const hash = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash;
+        const params = new URLSearchParams(hash);
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        if (accessToken && refreshToken) {
+          const { error: sessionError } =
+            await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+          if (sessionError) throw normalizeSupabaseError(sessionError);
+        }
+
+        // onAuthStateChange fires here → useSession updates →
+        // login screen's useEffect redirects to /(tabs).
       }
     },
   });

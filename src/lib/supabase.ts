@@ -39,7 +39,9 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     storage: secureStorage,
     autoRefreshToken: true,
     persistSession: true,
-    // Expo Go / native don't use URL-based session detection.
+    // detectSessionInUrl only works on web (window.location). On
+    // React Native we handle the OAuth redirect URL ourselves via
+    // Linking.getInitialURL() in the auth boot handler.
     detectSessionInUrl: false,
   },
 });
