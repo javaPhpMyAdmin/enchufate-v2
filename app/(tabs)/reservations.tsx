@@ -36,6 +36,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { ErrorState } from '@/components/molecules/ErrorState';
 import { LoadingState } from '@/components/molecules/LoadingState';
+import { Skeleton } from '@/components/molecules/Skeleton';
 import {
   ReservationCard,
   type ReservationRole as CardRole,
@@ -111,7 +112,24 @@ function AuthedList({
 
   const renderContent = () => {
     if (reservations.isLoading) {
-      return <LoadingState />;
+      return (
+        <View style={styles.skeletonList}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <View key={i} style={styles.skeletonCard}>
+              <View style={styles.skeletonCardHeader}>
+                <Skeleton width="40%" height={12} />
+                <Skeleton width="20%" height={12} />
+              </View>
+              <Skeleton width="80%" height={18} style={styles.skeletonSpacerSm} />
+              <Skeleton width="60%" height={12} style={styles.skeletonSpacerXs} />
+              <View style={styles.skeletonCardFooter}>
+                <Skeleton width="30%" height={12} />
+                <Skeleton width="20%" height={12} />
+              </View>
+            </View>
+          ))}
+        </View>
+      );
     }
     if (reservations.error) {
       return (
@@ -275,4 +293,21 @@ const styles = StyleSheet.create({
 
   list: { padding: spacing.base, gap: spacing.sm },
   separator: { height: spacing.sm },
+
+  // ----- Skeleton (loading) -----
+  skeletonList: { padding: spacing.base, gap: spacing.sm },
+  skeletonCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  skeletonCardHeader: { flexDirection: 'row', justifyContent: 'space-between' },
+  skeletonCardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+  },
+  skeletonSpacerSm: { marginTop: spacing.sm },
+  skeletonSpacerXs: { marginTop: spacing.xs },
 });

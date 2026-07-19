@@ -34,6 +34,7 @@ import { EmptyState } from '@/components/molecules/EmptyState';
 import { ErrorState } from '@/components/molecules/ErrorState';
 import { Icon } from '@/components/atoms/Icon';
 import { LoadingState } from '@/components/molecules/LoadingState';
+import { Skeleton } from '@/components/molecules/Skeleton';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { useConversations } from '@/features/messaging/hooks/useConversations';
 import type { Conversation } from '@/features/messaging/types';
@@ -108,7 +109,24 @@ function AuthedList({
   }, [conversations.data, query, userId]);
 
   if (conversations.isLoading) {
-    return <LoadingState />;
+    return (
+      <View style={[styles.flex, { paddingTop: topInset }]}>
+        <View style={styles.skeletonList}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <View key={i} style={styles.skeletonRow}>
+              <Skeleton width={48} height={48} borderRadius={radius.pill} />
+              <View style={styles.skeletonRowText}>
+                <View style={styles.skeletonRowHeader}>
+                  <Skeleton width="55%" height={14} />
+                  <Skeleton width="20%" height={12} />
+                </View>
+                <Skeleton width="80%" height={12} style={styles.skeletonSpacerXs} />
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
   }
 
   if (conversations.error) {
@@ -290,4 +308,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.primary,
   },
+
+  // ----- Skeleton (loading) -----
+  skeletonList: { paddingHorizontal: spacing.base, paddingTop: spacing.md },
+  skeletonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  skeletonRowText: { flex: 1, gap: 2 },
+  skeletonRowHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  skeletonSpacerXs: { marginTop: spacing.xs },
 });

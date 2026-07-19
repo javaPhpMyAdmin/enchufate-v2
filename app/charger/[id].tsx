@@ -61,7 +61,7 @@ import { Card } from '@/components/atoms/Card';
 import { Icon } from '@/components/atoms/Icon';
 import { StatusPill } from '@/components/atoms/StatusPill';
 import { ErrorState } from '@/components/molecules/ErrorState';
-import { LoadingState } from '@/components/molecules/LoadingState';
+import { Skeleton } from '@/components/molecules/Skeleton';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { useCharger } from '@/features/chargers/hooks/useCharger';
 import { CONNECTOR_LABEL } from '@/features/chargers/types';
@@ -117,7 +117,7 @@ export default function ChargerDetailScreen() {
     );
   }
   if (charger.isLoading) {
-    return <LoadingState label="Cargando cargador..." />;
+    return <ChargerDetailSkeleton topInset={insets.top} />;
   }
   if (charger.error) {
     return (
@@ -321,6 +321,57 @@ export default function ChargerDetailScreen() {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Charger detail loading skeleton                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Renders a hero placeholder + 3 stacked body blocks while
+ * `useCharger(id)` is in flight. Mirrors the layout of the
+ * real screen (hero image → identity card → map snippet → host
+ * card → description) so the transition from skeleton to real
+ * content is visually smooth.
+ */
+function ChargerDetailSkeleton({
+  topInset,
+}: {
+  topInset: number;
+}): React.JSX.Element {
+  return (
+    <View style={styles.flex}>
+      <View style={[styles.header, { paddingTop: topInset + spacing.sm }]}>
+        <View style={styles.backButtonPlaceholder} />
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          Cargador
+        </Text>
+      </View>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: topInset + spacing.xxl + 80 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Skeleton width="100%" height={280} borderRadius={0} style={styles.skeletonHero} />
+        <View style={styles.card}>
+          <Skeleton width="70%" height={22} />
+          <Skeleton width="50%" height={14} style={styles.skeletonSpacerSm} />
+          <Skeleton width="40%" height={14} style={styles.skeletonSpacerSm} />
+          <Skeleton width="35%" height={20} style={styles.skeletonSpacerMd} />
+        </View>
+        <Skeleton width="100%" height={160} borderRadius={radius.card} />
+        <View style={styles.card}>
+          <View style={styles.hostRow}>
+            <Skeleton width={48} height={48} borderRadius={radius.pill} />
+            <View style={styles.hostText}>
+              <Skeleton width="55%" height={16} />
+              <Skeleton width="40%" height={12} style={styles.skeletonSpacerSm} />
+              <Skeleton width="45%" height={12} />
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
 
@@ -405,4 +456,10 @@ const styles = StyleSheet.create({
   sheetTitle: { ...typography.title, color: colors.textPrimary },
   sheetBody: { ...typography.body, color: colors.textSecondary },
   sheetClose: { marginTop: spacing.sm },
+
+  // ----- Skeleton (loading) -----
+  backButtonPlaceholder: { width: 24, height: 24 },
+  skeletonHero: { width: SCREEN_WIDTH, marginHorizontal: -spacing.base },
+  skeletonSpacerSm: { marginTop: spacing.sm },
+  skeletonSpacerMd: { marginTop: spacing.md },
 });
