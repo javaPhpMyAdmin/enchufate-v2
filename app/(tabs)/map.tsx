@@ -4,40 +4,30 @@
  * Renders a MapLibre view tiled from OpenFreeMap (no tokens required)
  * centered on Uruguay, with native clustering of charger pins
  * (`cluster: true` on the GeoJSONSource, `clusterMaxZoom: 14`).
- * Below zoom 14 the user sees a bubble per cluster with the count;
- * at zoom >= 14 each charger is rendered as a `cargador.png` symbol.
  *
- * Tap behavior:
- *   - Cluster bubble → expand the cluster (animate camera to
- *     `getClusterExpansionZoom(clusterId)`).
- *   - Single charger pin → log the id to the console. The navigation
- *     to `/charger/[id]` lands in Phase 6; Expo Router will 404
- *     silently for now.
+ * **Lazy loading**: The MapLibre-dependent `MapContent` component is
+ * loaded via `React.lazy` to defer TurboModule resolution. This
+ * prevents the `MLRNCameraModule could not be found` crash that
+ * occurs when the app returns from Google OAuth (the bridge isn't
+ * fully ready when the native module is synchronously accessed).
  *
- * The Filtros pill at the top opens the FiltersSheet bottom sheet
- * (5 chip-group sections). FAB anchored bottom-right recenters on
- * the user's location (Uruguay fallback when permission denied).
- *
- * OSM attribution is rendered as a fixed footer (OSM ToS requirement
- * — see `openspec/specs/map/spec.md` non-functional notes).
+ * The Filtros pill and PermissionToast stay here — they don't
+ * depend on MapLibre.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import {
-  Camera,
-  Map as MapView,
-  GeoJSONSource,
-  Images,
-  Layer,
-  type CameraRef,
-  type GeoJSONSourceRef,
-  type PressEventWithFeatures,
-} from '@maplibre/maplibre-react-native';
-import type { Feature, FeatureCollection, Point } from 'geojson';
-import { SlidersHorizontal } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import React, {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { Linking, Pressable, Text, View } from 'react-native';
 import type { NativeSyntheticEvent } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { RefreshCw } from 'lucide-react-native';
 
 import { useChargers } from '@/features/chargers/hooks/useChargers';
 import { useFilterStore } from '@/stores/filterStore';
@@ -46,56 +36,55 @@ import {
   getLastKnownPosition,
   requestLocationPermission,
 } from '@/lib/location';
-import { FAB } from '@/components/atoms/FAB';
-import { Icon } from '@/components/atoms/Icon';
 import { LoadingState } from '@/components/molecules/LoadingState';
 import { ErrorState } from '@/components/molecules/ErrorState';
 import { PermissionToast } from '@/components/molecules/PermissionToast';
 import { FiltersSheet } from '@/components/organisms/FiltersSheet';
+import { Icon } from '@/components/atoms/Icon';
 import { colors, radius, spacing, typography } from '@/theme';
-import type { Charger } from '@/features/chargers/types';
 
-const OPENFREEMAP_LIBERTY = 'https://tiles.openfreemap.org/styles/liberty';
-const CARGADOR_ICON_ID = 'cargador';
+// ── Lazy import ──────────────────────────────────────────────
+// React.lazy defers the native module resolution to after the
+// first render cycle. This is the fix for the OAuth redirect crash.
+import type {
+  CameraRef,
+  GeoJSONSourceRef,
+  PressEventWithFeatures,
+  ChargerFC,
+} from './MapContent';
+import { chargersToGeoJSON } from './MapContent';
 
-const INITIAL_CAMERA = {
-  center: [URUGUAY_FALLBACK.lng, URUGUAY_FALLBACK.lat] as [number, number],
-  zoom: URUGUAY_FALLBACK.zoom,
-} as const;
+const MapContent = React.lazy(() => import('./MapContent'));
 
-interface ChargerFeatureProps {
-  id: string;
-  title: string;
-  connector_type: Charger['connector_type'];
-  power_kw: number;
-  status: Charger['status'];
-  cluster?: boolean;
-  cluster_id?: number;
-  point_count?: number;
+// ── Error boundary for lazy import failure ────────────────────
+interface LazyErrorBoundaryProps {
+  children: ReactNode;
+  fallback: ReactNode;
 }
 
-type ChargerFeature = Feature<Point, ChargerFeatureProps>;
-type ChargerFC = FeatureCollection<Point, ChargerFeatureProps>;
-
-function chargersToGeoJSON(chargers: Charger[]): ChargerFC {
-  return {
-    type: 'FeatureCollection',
-    features: chargers.map(
-      (c): ChargerFeature => ({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [c.lng, c.lat] },
-        properties: {
-          id: c.id,
-          title: c.title,
-          connector_type: c.connector_type,
-          power_kw: c.power_kw,
-          status: c.status,
-        },
-      }),
-    ),
-  };
+interface LazyErrorBoundaryState {
+  hasError: boolean;
 }
 
+class LazyErrorBoundary extends React.Component<
+  LazyErrorBoundaryProps,
+  LazyErrorBoundaryState
+> {
+  override state: LazyErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(): LazyErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  override render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
+
+// ── Component ────────────────────────────────────────────────
 export default function MapTab() {
   const insets = useSafeAreaInsets();
   const filters = useFilterStore((s) => s.filters);
@@ -104,14 +93,10 @@ export default function MapTab() {
   const sourceRef = useRef<GeoJSONSourceRef>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [showLocationToast, setShowLocationToast] = useState(false);
+  const [lazyFailed, setLazyFailed] = useState(false);
   const router = useRouter();
 
   // Request location permission on first mount (Phase 4 spec).
-  // A denied permission is non-fatal — the FAB falls back to
-  // Uruguay. Phase 8 swaps the previous console.warn for a
-  // PermissionToast banner with a CTA that opens iOS / Android
-  // Settings so the user can flip the toggle without leaving the
-  // app first.
   useEffect(() => {
     requestLocationPermission().then((result) => {
       if (result !== 'granted') {
@@ -135,22 +120,17 @@ export default function MapTab() {
     });
   }, []);
 
-  // Tap on either a cluster bubble or an individual pin.
-  // The MapLibre `onPress` source event exposes `features[]` with our
-  // typed `ChargerFeatureProps` shape (we just built the FC). The
-  // event is wrapped in a `NativeSyntheticEvent`; we unwrap it to
-  // read `features`.
   const handleSourcePress = useCallback(
     async (event: NativeSyntheticEvent<PressEventWithFeatures>) => {
       const feature = event.nativeEvent.features?.[0];
       if (!feature?.properties) return;
-      // The native side serializes properties as an unknown dict; we
-      // typed the FC, so the cast is safe.
-      const props = feature.properties as unknown as ChargerFeatureProps;
+      const props = feature.properties as unknown as {
+        cluster?: boolean;
+        cluster_id?: number;
+        id?: string;
+      };
       if (props.cluster && typeof props.cluster_id === 'number' && sourceRef.current) {
         const expansionZoom = await sourceRef.current.getClusterExpansionZoom(props.cluster_id);
-        // `zoomTo` animates to a new zoom level WITHOUT panning — the
-        // cluster stays centered in the viewport as it expands.
         cameraRef.current?.zoomTo(expansionZoom, { duration: 500 });
         return;
       }
@@ -161,6 +141,7 @@ export default function MapTab() {
     [router],
   );
 
+  // ── Loading / error states ────────────────────────────────
   if (isLoading) {
     return <LoadingState label="Cargando cargadores..." />;
   }
@@ -173,116 +154,71 @@ export default function MapTab() {
     );
   }
 
-  return (
-    <View style={styles.root}>
-      <MapView
-        style={StyleSheet.absoluteFill}
-        mapStyle={OPENFREEMAP_LIBERTY}
-        logo={false}
-        attribution={false}
-      >
-        <Camera
-          ref={cameraRef}
-          initialViewState={INITIAL_CAMERA}
-          center={INITIAL_CAMERA.center}
-          zoom={INITIAL_CAMERA.zoom}
-        />
-        <Images
-          images={{
-            [CARGADOR_ICON_ID]: require('@/../assets/icons/cargador.png'),
-          }}
-        />
-        {geojson ? (
-          <GeoJSONSource
-            ref={sourceRef}
-            data={geojson}
-            cluster
-            clusterRadius={50}
-            clusterMaxZoom={14}
-            onPress={handleSourcePress}
-          >
-            {/* Cluster bubble (rendered at zoom < 14). */}
-            <Layer
-              id="charger-clusters"
-              type="circle"
-              filter={['has', 'point_count']}
-              paint={{
-                'circle-color': colors.primary,
-                'circle-radius': [
-                  'step',
-                  ['get', 'point_count'],
-                  18,
-                  5,
-                  24,
-                  20,
-                  30,
-                ],
-                'circle-stroke-width': 3,
-                'circle-stroke-color': colors.surface,
-              }}
-            />
-            {/* Cluster count (number inside the bubble). */}
-            <Layer
-              id="charger-cluster-count"
-              type="symbol"
-              filter={['has', 'point_count']}
-              layout={{
-                'text-field': ['get', 'point_count_abbreviated'],
-                'text-size': 13,
-                'text-font': ['Noto Sans Regular'],
-              }}
-              paint={{
-                'text-color': colors.textOnPrimary,
-              }}
-            />
-            {/* Individual charger pin (zoom >= 14). */}
-            <Layer
-              id="charger-pin"
-              type="symbol"
-              filter={['!', ['has', 'point_count']]}
-              layout={{
-                'icon-image': CARGADOR_ICON_ID,
-                'icon-size': 0.12,
-                'icon-anchor': 'bottom',
-                'icon-allow-overlap': true,
-              }}
-            />
-          </GeoJSONSource>
-        ) : null}
-      </MapView>
-
-      {/* Filtros pill — top-left, above the safe area. */}
-      <View
-        pointerEvents="box-none"
-        style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}
-      >
+  // ── Lazy import failure fallback ──────────────────────────
+  if (lazyFailed) {
+    return (
+      <View style={fallbackStyles.base}>
+        <Icon icon={RefreshCw} size="lg" color={colors.textSecondary} />
+        <Text style={fallbackStyles.title}>No se pudo cargar el mapa</Text>
+        <Text style={fallbackStyles.body}>
+          Ocurrió un error al inicializar el mapa. Probá de nuevo.
+        </Text>
         <Pressable
-          onPress={() => setSheetOpen(true)}
-          style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}
+          onPress={() => {
+            setLazyFailed(false);
+            // Force a tick so the lazy component unmounts then remounts
+            requestAnimationFrame(() => setLazyFailed(false));
+          }}
+          style={({ pressed }) => [
+            fallbackStyles.button,
+            pressed && fallbackStyles.buttonPressed,
+          ]}
           accessibilityRole="button"
-          accessibilityLabel="Abrir filtros"
+          accessibilityLabel="Reintentar carga del mapa"
         >
-          <Icon icon={SlidersHorizontal} size="sm" color={colors.textPrimary} />
-          <Text style={styles.pillLabel}>Filtros</Text>
+          <Text style={fallbackStyles.buttonLabel}>Reintentar</Text>
         </Pressable>
       </View>
+    );
+  }
 
-      {/* OSM attribution (required by OpenStreetMap ToS). */}
-      <View
-        pointerEvents="none"
-        style={[styles.attribution, { bottom: insets.bottom + spacing.xs }]}
+  // ── Main render ───────────────────────────────────────────
+  return (
+    <View style={{ flex: 1 }}>
+      <LazyErrorBoundary
+        fallback={
+          <View style={fallbackStyles.base}>
+            <Icon icon={RefreshCw} size="lg" color={colors.textSecondary} />
+            <Text style={fallbackStyles.title}>No se pudo cargar el mapa</Text>
+            <Text style={fallbackStyles.body}>
+              Ocurrió un error al inicializar el mapa. Probá de nuevo.
+            </Text>
+            <Pressable
+              onPress={() => setLazyFailed(true)}
+              style={({ pressed }) => [
+                fallbackStyles.button,
+                pressed && fallbackStyles.buttonPressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Reintentar carga del mapa"
+            >
+              <Text style={fallbackStyles.buttonLabel}>Reintentar</Text>
+            </Pressable>
+          </View>
+        }
       >
-        <Text style={styles.attributionText}>
-          © OpenFreeMap © OpenStreetMap contributors
-        </Text>
-      </View>
-
-      {/* Recenter FAB — bottom-right. */}
-      <FAB
-        onPress={handleRecenter}
-        accessibilityLabel="Centrar mapa en tu ubicación"
-        style={{ bottom: insets.bottom + spacing.lg }}
-      />
+        <Suspense fallback={<LoadingState label="Cargando mapa..." />}>
+          <MapContent
+            geojson={geojson}
+            onRecenter={handleRecenter}
+            onSourcePress={handleSourcePress}
+            insets={insets}
+            onFilterPress={() => setSheetOpen(true)}
+            cameraRef={cameraRef}
+            sourceRef={sourceRef}
+          />
+        </Suspense>
+      </LazyErrorBoundary>
 
       <FiltersSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} />
 
@@ -300,44 +236,38 @@ export default function MapTab() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-  topBar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
+// ── Lazy import error fallback styles ────────────────────────
+const fallbackStyles = {
+  base: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.xl,
   },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    minHeight: 40,
+  title: {
+    ...typography.body,
+    color: colors.textPrimary,
+    fontWeight: '600' as const,
+    marginTop: spacing.base,
   },
-  pillPressed: { opacity: 0.85 },
-  pillLabel: { ...typography.caption, color: colors.textPrimary, fontWeight: '600' },
-  attribution: {
-    position: 'absolute',
-    left: spacing.sm,
-    right: spacing.sm,
-    alignItems: 'center',
-  },
-  attributionText: {
-    ...typography.caption,
+  body: {
+    ...typography.body,
     color: colors.textSecondary,
-    fontSize: 11,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
+    textAlign: 'center' as const,
+    marginTop: spacing.xs,
+  },
+  button: {
+    marginTop: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.primary,
     borderRadius: radius.button,
   },
-});
+  buttonPressed: { opacity: 0.85 },
+  buttonLabel: {
+    ...typography.body,
+    color: colors.textOnPrimary,
+    fontWeight: '600' as const,
+  },
+};
