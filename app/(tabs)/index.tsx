@@ -59,7 +59,7 @@ export default function InicioTab() {
       >
         <View style={styles.ctaRow}>
           <View style={[styles.iconCircle, styles.iconCircleBuscar]}>
-            <Search size={32} color={colors.primary} strokeWidth={2} />
+            <Search size={36} color={colors.primary} strokeWidth={2} />
           </View>
           <View style={styles.ctaText}>
             <Text style={styles.ctaTitle}>Buscar un cargador</Text>
@@ -78,7 +78,7 @@ export default function InicioTab() {
       >
         <View style={styles.ctaRow}>
           <View style={[styles.iconCircle, styles.iconCirclePublicar]}>
-            <MapPin size={32} color={colors.primary} strokeWidth={2} />
+            <MapPin size={36} color={colors.primary} strokeWidth={2} />
           </View>
           <View style={styles.ctaText}>
             <Text style={styles.ctaTitlePrimary}>Publicar mi cargador</Text>
@@ -133,17 +133,17 @@ const styles = StyleSheet.create({
   // CTA cards (shared) — bumped up for more screen presence
   ctaCard: {
     marginTop: spacing.base,
-    minHeight: 110,
+    minHeight: 140,
   },
   ctaCardPrimary: {
     marginTop: spacing.base,
-    minHeight: 110,
+    minHeight: 140,
     backgroundColor: colors.primary,
   },
   ctaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   iconCircle: {
-    width: 72,
-    height: 72,
+    width: 80,
+    height: 80,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
