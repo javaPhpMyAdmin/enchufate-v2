@@ -39,11 +39,14 @@ export default function InicioTab() {
         <Text style={styles.wordmark}>Enchufate</Text>
       </View>
 
-      {/* Hero card: solid orange (no image) */}
-      <Card variant="elevated" padding="none" style={styles.heroCardSolid}>
-        <View style={styles.heroSolidInner}>
-          <Text style={styles.heroSolidText}>Enchufate</Text>
-        </View>
+      {/* Hero card: car + charger photo (16:9, user-provided PNG) */}
+      <Card variant="elevated" padding="none" style={styles.heroCard}>
+        <Image
+          source={require('@/../assets/images/home_card.png')}
+          style={styles.heroImage}
+          resizeMode="cover"
+          accessibilityLabel="Auto eléctrico enchufado a un cargador"
+        />
       </Card>
 
       {/* CTA card 1: Buscar un cargador (white) */}
