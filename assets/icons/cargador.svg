@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 200" width="200" height="400">
+  <!-- Sombra suave del cuerpo -->
+  <ellipse cx="50" cy="195" rx="28" ry="4" fill="#000" opacity="0.15" />
+
+  <!-- Cuerpo principal del cargador (rectangulo vertical con esquinas redondeadas) -->
+  <rect x="22" y="8" width="56" height="180" rx="8" fill="#FF6B1F" />
+
+  <!-- Degradado sutil en el cuerpo para dar volumen -->
+  <rect x="22" y="8" width="56" height="180" rx="8" fill="url(#bodyGrad)" opacity="0.3" />
+
+  <!-- Pantalla blanca superior -->
+  <rect x="30" y="22" width="40" height="28" rx="3" fill="#FFFFFF" />
+  <rect x="30" y="22" width="40" height="28" rx="3" fill="none" stroke="#0F1419" stroke-width="1.5" />
+
+  <!-- Texto EVS en la pantalla -->
+  <text x="50" y="42" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F1419" text-anchor="middle" letter-spacing="0.5">EVS</text>
+
+  <!-- Indicador LED verde -->
+  <circle cx="50" cy="62" r="3" fill="#1FA774" />
+
+  <!-- Botón de encendido -->
+  <circle cx="50" cy="80" r="5" fill="#FFFFFF" stroke="#0F1419" stroke-width="1.5" />
+
+  <!-- Linea divisoria -->
+  <line x1="32" y1="98" x2="68" y2="98" stroke="#FFFFFF" stroke-width="1" opacity="0.4" />
+
+  <!-- Salida del cable (punto de anclaje) -->
+  <circle cx="50" cy="112" r="4" fill="#0F1419" />
+  <circle cx="50" cy="112" r="2" fill="#FFFFFF" />
+
+  <!-- Cable (curva organica desde el cuerpo hacia abajo) -->
+  <path d="M 50 116
+           C 50 130, 60 138, 60 152
+           C 60 168, 50 176, 50 188"
+        stroke="#0F1419" stroke-width="4" fill="none" stroke-linecap="round" />
+
+  <!-- Mango del conector (parte superior, mas ancho) -->
+  <path d="M 42 175 L 58 175 L 56 185 L 44 185 Z" fill="#0F1419" />
+
+  <!-- Punta del conector (enchufe) -->
+  <rect x="45" y="185" width="10" height="12" rx="1" fill="#0F1419" />
+
+  <!-- Highlight sutil en el cuerpo (reflejo de luz) -->
+  <rect x="28" y="14" width="4" height="170" rx="2" fill="#FFFFFF" opacity="0.25" />
+
+  <defs>
+    <linearGradient id="bodyGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0" />
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.4" />
+      <stop offset="1" stop-color="#000000" stop-opacity="0.15" />
+    </linearGradient>
+  </defs>
+</svg>
