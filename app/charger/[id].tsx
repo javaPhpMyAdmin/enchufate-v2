@@ -60,11 +60,6 @@ import { CONNECTOR_LABEL } from '@/features/chargers/types';
 import { formatPrice } from '@/lib/format';
 import { colors, radius, spacing, typography } from '@/theme';
 
-// ── Lazy-loaded map snippet (avoids TurboModule crash post-OAuth)
-const ChargerMapSnippet = React.lazy(
-  () => import('@/components/organisms/ChargerMapSnippet'),
-);
-
 const PLACEHOLDER_PHOTO = require('@/../assets/icons/cargador.png');
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -78,13 +73,19 @@ export default function ChargerDetailScreen() {
   const charger = useCharger(chargerId);
   const sheetRef = useRef<BottomSheetModal>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
-  const [mounted, setMounted] = useState(false);
 
-  // Mount guard: defer ChargerMapSnippet until after the first render cycle.
-  // Prevents MLRNCameraModule crash on post-OAuth redirect.
+  // Dynamic import for ChargerMapSnippet (avoids TurboModule crash).
+  const [MapSnippet, setMapSnippet] = useState<React.ComponentType<any> | null>(null);
+  const [mapSnippetError, setMapSnippetError] = useState(false);
+
   useEffect(() => {
-    const id = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(id);
+    let cancelled = false;
+    import('@/components/organisms/ChargerMapSnippet')
+      .then((mod) => {
+        if (!cancelled) { setMapSnippet(() => mod.default); setMapSnippetError(false); }
+      })
+      .catch(() => { if (!cancelled) setMapSnippetError(true); });
+    return () => { cancelled = true; };
   }, []);
 
   const onOpenInMaps = useCallback(() => {
@@ -211,16 +212,14 @@ export default function ChargerDetailScreen() {
         </Card>
 
         {/* Map snippet */}
-        {mounted ? (
-          <React.Suspense fallback={<View style={styles.mapWrap} />}>
-            <ChargerMapSnippet
-              lng={c.lng}
-              lat={c.lat}
-              id={c.id}
-              onPress={onOpenInMaps}
-            />
-          </React.Suspense>
-        ) : (
+        {MapSnippet ? (
+          <MapSnippet
+            lng={c.lng}
+            lat={c.lat}
+            id={c.id}
+            onPress={onOpenInMaps}
+          />
+        ) : mapSnippetError ? null : (
           <View style={styles.mapWrap} />
         )}
 

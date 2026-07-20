@@ -1,27 +1,16 @@
 /**
- * MapContent — MapLibre-rendered charger map surface.
+ * MapContent — Mapbox-rendered charger map surface.
  *
- * Extracted from map.tsx and lazy-loaded to avoid the TurboModule
- * race condition where `MLRNCameraModule` is not yet available when
- * the app returns from Google OAuth. `React.lazy` defers the native
- * module resolution to after the first render cycle.
+ * Extracted from map.tsx and loaded via dynamic import() to avoid
+ * TurboModule crashes when the native bridge isn't ready.
  *
- * This component owns all MapLibre imports and the static
+ * This component owns all Mapbox imports and the static
  * `require()` for the cargador icon. The parent (map.tsx) creates
  * the refs and callbacks; they are passed in as props.
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import {
-  Camera,
-  Map as MapView,
-  GeoJSONSource,
-  Images,
-  Layer,
-  type CameraRef,
-  type GeoJSONSourceRef,
-  type PressEventWithFeatures,
-} from '@maplibre/maplibre-react-native';
+import MapboxGL from '@rnmapbox/maps';
 import type { NativeSyntheticEvent } from 'react-native';
 import { SlidersHorizontal } from 'lucide-react-native';
 
@@ -31,28 +20,26 @@ import { URUGUAY_FALLBACK } from '@/lib/location';
 import { colors, radius, spacing, typography } from '@/theme';
 
 // ── Constants ────────────────────────────────────────────────
-const OPENFREEMAP_LIBERTY = 'https://tiles.openfreemap.org/styles/liberty';
+const MAPBOX_STYLE = MapboxGL.StyleURL.Street;
 const CARGADOR_ICON_ID = 'cargador';
 
 const INITIAL_CAMERA = {
-  center: [URUGUAY_FALLBACK.lng, URUGUAY_FALLBACK.lat] as [number, number],
-  zoom: URUGUAY_FALLBACK.zoom,
+  centerCoordinate: [URUGUAY_FALLBACK.lng, URUGUAY_FALLBACK.lat] as [number, number],
+  zoomLevel: URUGUAY_FALLBACK.zoom,
 } as const;
 
 // ── GeoJSON type ─────────────────────────────────────────────
-// Matches the parent's ChargerFC so there's no cross-module type
-// mismatch. MapLibre accepts FeatureCollection at runtime.
 export type ChargerFC = import('geojson').FeatureCollection<import('geojson').Point>;
 
 // ── Props ────────────────────────────────────────────────────
 export interface MapContentProps {
   geojson: ChargerFC | null;
   onRecenter: () => void;
-  onSourcePress: (event: NativeSyntheticEvent<PressEventWithFeatures>) => void;
+  onSourcePress: (event: any) => void;
   insets: { top: number; bottom: number };
   onFilterPress: () => void;
-  cameraRef: React.RefObject<CameraRef | null>;
-  sourceRef: React.RefObject<GeoJSONSourceRef | null>;
+  cameraRef: React.RefObject<any>;
+  sourceRef: React.RefObject<any>;
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -67,40 +54,40 @@ export default function MapContent({
 }: MapContentProps) {
   return (
     <View style={styles.root}>
-      <MapView
+      <MapboxGL.MapView
         style={StyleSheet.absoluteFill}
-        mapStyle={OPENFREEMAP_LIBERTY}
-        logo={false}
-        attribution={false}
+        styleURL={MAPBOX_STYLE}
+        logoEnabled={false}
+        attributionEnabled={false}
       >
-        <Camera
+        <MapboxGL.Camera
           ref={cameraRef}
-          initialViewState={INITIAL_CAMERA}
-          center={INITIAL_CAMERA.center}
-          zoom={INITIAL_CAMERA.zoom}
+          centerCoordinate={INITIAL_CAMERA.centerCoordinate}
+          zoomLevel={INITIAL_CAMERA.zoomLevel}
+          animationDuration={0}
         />
-        <Images
+        <MapboxGL.Images
           images={{
             [CARGADOR_ICON_ID]: require('@/../assets/icons/cargador.png'),
           }}
         />
         {geojson ? (
-          <GeoJSONSource
+          <MapboxGL.ShapeSource
+            id="chargers"
             ref={sourceRef}
-            data={geojson}
+            shape={geojson}
             cluster
             clusterRadius={50}
-            clusterMaxZoom={14}
+            clusterMaxZoomLevel={14}
             onPress={onSourcePress}
           >
             {/* Cluster bubble (rendered at zoom < 14). */}
-            <Layer
+            <MapboxGL.CircleLayer
               id="charger-clusters"
-              type="circle"
               filter={['has', 'point_count']}
-              paint={{
-                'circle-color': colors.primary,
-                'circle-radius': [
+              style={{
+                circleColor: colors.primary,
+                circleRadius: [
                   'step',
                   ['get', 'point_count'],
                   18,
@@ -109,39 +96,34 @@ export default function MapContent({
                   20,
                   30,
                 ],
-                'circle-stroke-width': 3,
-                'circle-stroke-color': colors.surface,
+                circleStrokeWidth: 3,
+                circleStrokeColor: colors.surface,
               }}
             />
             {/* Cluster count (number inside the bubble). */}
-            <Layer
+            <MapboxGL.SymbolLayer
               id="charger-cluster-count"
-              type="symbol"
               filter={['has', 'point_count']}
-              layout={{
-                'text-field': ['get', 'point_count_abbreviated'],
-                'text-size': 13,
-                'text-font': ['Noto Sans Regular'],
-              }}
-              paint={{
-                'text-color': colors.textOnPrimary,
+              style={{
+                textField: ['get', 'point_count_abbreviated'],
+                textSize: 13,
+                textColor: colors.textOnPrimary,
               }}
             />
             {/* Individual charger pin (zoom >= 14). */}
-            <Layer
+            <MapboxGL.SymbolLayer
               id="charger-pin"
-              type="symbol"
               filter={['!', ['has', 'point_count']]}
-              layout={{
-                'icon-image': CARGADOR_ICON_ID,
-                'icon-size': 0.12,
-                'icon-anchor': 'bottom',
-                'icon-allow-overlap': true,
+              style={{
+                iconImage: CARGADOR_ICON_ID,
+                iconSize: 0.12,
+                iconAnchor: 'bottom',
+                iconAllowOverlap: true,
               }}
             />
-          </GeoJSONSource>
+          </MapboxGL.ShapeSource>
         ) : null}
-      </MapView>
+      </MapboxGL.MapView>
 
       {/* Filtros pill — top-left, above the safe area. */}
       <View
@@ -159,13 +141,13 @@ export default function MapContent({
         </Pressable>
       </View>
 
-      {/* OSM attribution (required by OpenStreetMap ToS). */}
+      {/* Mapbox attribution (required by ToS). */}
       <View
         pointerEvents="none"
         style={[styles.attribution, { bottom: insets.bottom + spacing.xs }]}
       >
         <Text style={styles.attributionText}>
-          © OpenFreeMap © OpenStreetMap contributors
+          © Mapbox © OpenStreetMap contributors
         </Text>
       </View>
 

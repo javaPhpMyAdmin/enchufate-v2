@@ -1,26 +1,18 @@
 /**
- * ChargerMapSnippet — small MapLibre preview used in charger detail.
+ * ChargerMapSnippet — small Mapbox preview used in charger detail.
  *
- * Extracted and lazy-loaded from [id].tsx to avoid the
- * `MLRNCameraModule` TurboModule crash on post-OAuth redirect.
- * Mount guard (parent controls rendering) ensures the native bridge
- * is ready before MapLibre components mount.
+ * Extracted and loaded via dynamic import from [id].tsx to avoid
+ * TurboModule crash on post-OAuth redirect.
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import {
-  Camera as MapCamera,
-  Map as MapView,
-  GeoJSONSource,
-  Images,
-  Layer,
-} from '@maplibre/maplibre-react-native';
+import MapboxGL from '@rnmapbox/maps';
 import { ArrowUpRight } from 'lucide-react-native';
 
 import { Icon } from '@/components/atoms/Icon';
 import { colors, radius, spacing, typography } from '@/theme';
 
-const OPENFREEMAP_LIBERTY = 'https://tiles.openfreemap.org/styles/liberty';
+const MAPBOX_STYLE = MapboxGL.StyleURL.Street;
 const CARGADOR_SNIPPET_ICON = 'cargador-snippet';
 
 interface Props {
@@ -49,28 +41,33 @@ export default function ChargerMapSnippet({ lng, lat, id, onPress }: Props) {
       accessibilityLabel="Ver en el mapa"
       style={styles.mapWrap}
     >
-      <MapView
+      <MapboxGL.MapView
         style={StyleSheet.absoluteFill}
-        mapStyle={OPENFREEMAP_LIBERTY}
-        logo={false}
-        attribution={false}
+        styleURL={MAPBOX_STYLE}
+        logoEnabled={false}
+        attributionEnabled={false}
         pointerEvents="none"
       >
-        <MapCamera center={[lng, lat]} zoom={14} />
-        <Images images={{ [CARGADOR_SNIPPET_ICON]: require('@/../assets/icons/cargador.png') }} />
-        <GeoJSONSource data={geojson}>
-          <Layer
+        <MapboxGL.Camera
+          centerCoordinate={[lng, lat]}
+          zoomLevel={14}
+          animationDuration={0}
+        />
+        <MapboxGL.Images
+          images={{ [CARGADOR_SNIPPET_ICON]: require('@/../assets/icons/cargador.png') }}
+        />
+        <MapboxGL.ShapeSource id="snippet-source" shape={geojson}>
+          <MapboxGL.SymbolLayer
             id="snippet-pin"
-            type="symbol"
-            layout={{
-              'icon-image': CARGADOR_SNIPPET_ICON,
-              'icon-size': 0.12,
-              'icon-anchor': 'bottom',
-              'icon-allow-overlap': true,
+            style={{
+              iconImage: CARGADOR_SNIPPET_ICON,
+              iconSize: 0.12,
+              iconAnchor: 'bottom',
+              iconAllowOverlap: true,
             }}
           />
-        </GeoJSONSource>
-      </MapView>
+        </MapboxGL.ShapeSource>
+      </MapboxGL.MapView>
       <View style={styles.mapOverlay} pointerEvents="none">
         <Text style={styles.mapOverlayText}>Ver en Google Maps</Text>
         <Icon icon={ArrowUpRight} size="sm" color={colors.textOnPrimary} />

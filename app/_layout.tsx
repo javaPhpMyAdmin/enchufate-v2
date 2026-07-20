@@ -58,6 +58,13 @@ import {
   QUERY_CACHE_MAX_AGE_MS,
   asyncStoragePersister,
 } from '@/lib/queryPersister';
+import MapboxGL from '@rnmapbox/maps';
+
+// Set Mapbox access token before any map component renders.
+const mapboxToken = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+if (mapboxToken) {
+  MapboxGL.setAccessToken(mapboxToken);
+}
 
 export default function RootLayout() {
   // Mounted for its side effects (subscribes to onAuthStateChange,

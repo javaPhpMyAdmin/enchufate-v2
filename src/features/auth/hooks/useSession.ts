@@ -32,10 +32,23 @@ import type { AuthState } from '../types';
 const INITIAL: AuthState = { session: null, user: null, isLoading: true };
 
 /**
+ * Module-level flag to ensure the deep link is only consumed once,
+ * even when multiple `useSession` instances mount simultaneously
+ * (login screen, root layout, tab layout). Without this,
+ * `Linking.getInitialURL()` returns the same URL to each caller,
+ * causing redundant `setSession` calls.
+ */
+let deepLinkHandled = false;
+
+/**
  * Check if the app was opened via an OAuth deep link and create the
  * session. Returns after processing (or immediately if no auth URL).
+ * Only runs once per process lifetime.
  */
 async function handleOAuthDeepLink(): Promise<void> {
+  if (deepLinkHandled) return;
+  deepLinkHandled = true;
+
   let url: string | null;
   try {
     url = await Linking.getInitialURL();
@@ -50,6 +63,8 @@ async function handleOAuthDeepLink(): Promise<void> {
     // --- PKCE flow: ?code=... ---
     const code = parsed.searchParams.get('code');
     if (code) {
+      // eslint-disable-next-line no-console
+      console.warn('[useSession] OAuth deep link detected (PKCE code)');
       await supabase.auth.exchangeCodeForSession(code);
       return;
     }
@@ -60,6 +75,8 @@ async function handleOAuthDeepLink(): Promise<void> {
     const accessToken = params.get('access_token');
     const refreshToken = params.get('refresh_token');
     if (accessToken && refreshToken) {
+      // eslint-disable-next-line no-console
+      console.warn('[useSession] OAuth deep link detected (implicit tokens)');
       await supabase.auth.setSession({
         access_token: accessToken,
         refresh_token: refreshToken,

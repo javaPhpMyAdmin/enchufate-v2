@@ -16,9 +16,9 @@
   },
   "dependencies": {
     "@gorhom/bottom-sheet": "^5",
-    "@maplibre/maplibre-react-native": "^11.3.6",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/datetimepicker": "^8.4.4",
+    "@rnmapbox/maps": "^10.3.2",
     "@supabase/supabase-js": "^2.110.2",
     "@tanstack/query-async-storage-persister": "^5.101.2",
     "@tanstack/query-persist-client-core": "^5.101.2",

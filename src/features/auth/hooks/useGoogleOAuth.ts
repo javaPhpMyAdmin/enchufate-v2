@@ -107,10 +107,12 @@ export function useGoogleOAuth(): UseGoogleOAuthResult {
         // --- PKCE flow ---
         const code = url.searchParams.get('code');
         if (code) {
+          // eslint-disable-next-line no-console
+          console.warn('[useGoogleOAuth] PKCE code received, exchanging...');
           const { error: exchangeError } =
             await supabase.auth.exchangeCodeForSession(code);
           if (exchangeError) throw normalizeSupabaseError(exchangeError);
-          return;
+          return; // ← session created, onAuthStateChange will fire
         }
 
         // --- Implicit flow (hash fragment) ---
@@ -119,16 +121,27 @@ export function useGoogleOAuth(): UseGoogleOAuthResult {
         const accessToken = params.get('access_token');
         const refreshToken = params.get('refresh_token');
         if (accessToken && refreshToken) {
+          // eslint-disable-next-line no-console
+          console.warn('[useGoogleOAuth] Implicit tokens received, setting session...');
           const { error: sessionError } =
             await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken,
             });
           if (sessionError) throw normalizeSupabaseError(sessionError);
+          return; // ← session created, onAuthStateChange will fire
         }
 
-        // onAuthStateChange fires here → useSession updates →
-        // login screen's useEffect redirects to /(tabs).
+        // If we reach here, the redirect URL had no auth data.
+        // On Android this can happen when the deep link restarts the
+        // app and openAuthSessionAsync returns a partial URL — the
+        // real session is created by useSession's boot-time handler.
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[useGoogleOAuth] Success result but no tokens in URL — ' +
+          'session may be handled by boot-time deep link handler. URL: ' +
+          result.url.slice(0, 120),
+        );
       }
     },
   });
