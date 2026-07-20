@@ -44,7 +44,7 @@ export function ErrorState({
       <Text style={styles.body}>{body}</Text>
       {onRetry ? (
         <View style={styles.cta}>
-          <Button label={retryLabel} onPress={onRetry} variant="primary" />
+          <Button label={retryLabel} onPress={onRetry} variant="primary" fullWidth />
         </View>
       ) : null}
     </View>

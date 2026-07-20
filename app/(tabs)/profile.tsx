@@ -69,7 +69,7 @@ export default function ProfileTab() {
 
   return (
     <AuthedState
-      userId={userId ?? 'mock-uid'}
+      userId={userId!}
       insetsTop={insets.top}
       insetsBottom={insets.bottom}
       onPublishPress={() => router.push('/publish/1-name' as never)}
