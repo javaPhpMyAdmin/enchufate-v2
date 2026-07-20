@@ -58,7 +58,6 @@ import {
   QUERY_CACHE_MAX_AGE_MS,
   asyncStoragePersister,
 } from '@/lib/queryPersister';
-import { initMapbox } from '@/lib/mapbox';
 
 export default function RootLayout() {
   // Mounted for its side effects (subscribes to onAuthStateChange,
@@ -69,10 +68,6 @@ export default function RootLayout() {
   // ----- Boot side effects (Phase 8 polish) -----
   useEffect(() => {
     let cancelled = false;
-
-    // 0. MapBox init — must run after mount so the native bridge is
-    //    ready. Idempotent; safe to call on every mount.
-    initMapbox();
 
     // 1. Asset preloading — home hero + map pin. Best-effort; the
     //    screens still render via `require()` if the cache write

@@ -1,21 +1,16 @@
 /**
  * ChargerMapSnippet — small Mapbox preview used in charger detail.
  *
- * Extracted and loaded via dynamic import from [id].tsx to avoid
- * TurboModule crash on post-OAuth redirect.
- *
- * Uses safe MapBox wrapper — renders a placeholder if the native
- * module is unavailable (Expo Go, stale build, cold start).
+ * CRITICAL: All @rnmapbox/maps usage is via dynamic import() inside
+ * useEffect. Shows a placeholder when the native module is unavailable.
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { MapboxGL, isMapboxReady } from '@/lib/mapbox';
 import { ArrowUpRight } from 'lucide-react-native';
 
 import { Icon } from '@/components/atoms/Icon';
 import { colors, radius, spacing, typography } from '@/theme';
 
-const MAPBOX_STYLE = MapboxGL?.StyleURL?.Street ?? 'MapboxStandardStyleV8';
 const CARGADOR_SNIPPET_ICON = 'cargador-snippet';
 
 interface Props {
@@ -26,7 +21,41 @@ interface Props {
 }
 
 export default function ChargerMapSnippet({ lng, lat, id, onPress }: Props) {
-  if (!isMapboxReady() || !MapboxGL) {
+  const [MapboxGL, setMapboxGL] = useState<any>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const mod = await import('@rnmapbox/maps');
+        if (cancelled) return;
+        const gl = mod.default ?? mod;
+        const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+        if (token && gl?.setAccessToken) {
+          gl.setAccessToken(token);
+        }
+        setMapboxGL(() => gl);
+        setReady(true);
+      } catch {
+        if (!cancelled) setReady(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const geojson = {
+    type: 'FeatureCollection' as const,
+    features: [
+      {
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [lng, lat] },
+        properties: { id },
+      },
+    ],
+  };
+
+  if (!ready || !MapboxGL) {
     return (
       <Pressable
         onPress={onPress}
@@ -41,16 +70,7 @@ export default function ChargerMapSnippet({ lng, lat, id, onPress }: Props) {
     );
   }
 
-  const geojson = {
-    type: 'FeatureCollection' as const,
-    features: [
-      {
-        type: 'Feature' as const,
-        geometry: { type: 'Point' as const, coordinates: [lng, lat] },
-        properties: { id },
-      },
-    ],
-  };
+  const MAPBOX_STYLE = MapboxGL.StyleURL?.Street ?? 'MapboxStandardStyleV8';
 
   return (
     <Pressable

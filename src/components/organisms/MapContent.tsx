@@ -1,16 +1,13 @@
 /**
- * MapContent — Mapbox-rendered charger map surface.
+ * MapContent — charger map surface.
  *
- * Extracted from map.tsx and loaded via dynamic import() to avoid
- * TurboModule crashes when the native bridge isn't ready.
- *
- * This component owns all Mapbox imports and the static
- * `require()` for the cargador icon. The parent (map.tsx) creates
- * the refs and callbacks; they are passed in as props.
+ * CRITICAL: All @rnmapbox/maps usage is via dynamic import() inside
+ * useEffect. This prevents the "native code not available" crash
+ * when the APK doesn't have the native module (Expo Go, stale build,
+ * etc.). The component shows a fallback until the import succeeds.
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { MapboxGL, isMapboxReady } from '@/lib/mapbox';
 import type { NativeSyntheticEvent } from 'react-native';
 import { SlidersHorizontal } from 'lucide-react-native';
 
@@ -19,8 +16,6 @@ import { Icon } from '@/components/atoms/Icon';
 import { URUGUAY_FALLBACK } from '@/lib/location';
 import { colors, radius, spacing, typography } from '@/theme';
 
-// ── Constants ────────────────────────────────────────────────
-const MAPBOX_STYLE = MapboxGL?.StyleURL?.Street ?? 'MapboxStandardStyleV8';
 const CARGADOR_ICON_ID = 'cargador';
 
 const INITIAL_CAMERA = {
@@ -52,16 +47,40 @@ export default function MapContent({
   cameraRef,
   sourceRef,
 }: MapContentProps) {
-  // If the native module didn't load, show a placeholder.
-  if (!isMapboxReady() || !MapboxGL) {
+  const [MapboxGL, setMapboxGL] = useState<any>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const mod = await import('@rnmapbox/maps');
+        if (cancelled) return;
+        const gl = mod.default ?? mod;
+        const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+        if (token && gl?.setAccessToken) {
+          gl.setAccessToken(token);
+        }
+        setMapboxGL(() => gl);
+        setReady(true);
+      } catch {
+        if (!cancelled) setReady(true); // ready but MapboxGL stays null → fallback
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (!ready || !MapboxGL) {
     return (
       <View style={[styles.root, styles.fallback]}>
         <Text style={styles.fallbackText}>
-          El mapa no está disponible en este dispositivo.
+          {ready ? 'Mapa no disponible en este dispositivo' : 'Cargando mapa...'}
         </Text>
       </View>
     );
   }
+
+  const MAPBOX_STYLE = MapboxGL.StyleURL?.Street ?? 'MapboxStandardStyleV8';
 
   return (
     <View style={styles.root}>
@@ -92,7 +111,6 @@ export default function MapContent({
             clusterMaxZoomLevel={14}
             onPress={onSourcePress}
           >
-            {/* Cluster bubble (rendered at zoom < 14). */}
             <MapboxGL.CircleLayer
               id="charger-clusters"
               filter={['has', 'point_count']}
@@ -111,7 +129,6 @@ export default function MapContent({
                 circleStrokeColor: colors.surface,
               }}
             />
-            {/* Cluster count (number inside the bubble). */}
             <MapboxGL.SymbolLayer
               id="charger-cluster-count"
               filter={['has', 'point_count']}
@@ -121,7 +138,6 @@ export default function MapContent({
                 textColor: colors.textOnPrimary,
               }}
             />
-            {/* Individual charger pin (zoom >= 14). */}
             <MapboxGL.SymbolLayer
               id="charger-pin"
               filter={['!', ['has', 'point_count']]}
