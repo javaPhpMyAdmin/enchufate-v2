@@ -146,7 +146,9 @@ export default function MapTab() {
 
   const handleSourcePress = useCallback(
     async (event: any) => {
-      const feature = event.nativeEvent.features?.[0];
+      // @rnmapbox/maps moved features from event.nativeEvent.features
+      // to event.features — handle both for compatibility.
+      const feature = event.features?.[0] ?? event.nativeEvent?.features?.[0];
       if (!feature?.properties) return;
       const props = feature.properties as Record<string, unknown> & {
         cluster?: boolean;

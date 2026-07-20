@@ -85,7 +85,10 @@ function GuestState({
       style={[
         styles.flex,
         styles.guest,
-        { paddingTop: insetsTop + spacing.xl, paddingBottom: insetsBottom + spacing.xl },
+        {
+          paddingTop: insetsTop + spacing.xl,
+          paddingBottom: insetsBottom + spacing.xl,
+        },
       ]}
     >
       <View style={styles.guestIcon}>
@@ -151,7 +154,11 @@ function AuthedList({
                   <Skeleton width="55%" height={14} />
                   <Skeleton width="20%" height={12} />
                 </View>
-                <Skeleton width="80%" height={12} style={styles.skeletonSpacerXs} />
+                <Skeleton
+                  width="80%"
+                  height={12}
+                  style={styles.skeletonSpacerXs}
+                />
               </View>
             </View>
           ))}
@@ -243,15 +250,17 @@ function ConversationRow({
         </View>
         <View style={styles.rowSubheader}>
           <Text
-            style={[
-              styles.rowPreview,
-              unread ? styles.rowPreviewUnread : null,
-            ]}
+            style={[styles.rowPreview, unread ? styles.rowPreviewUnread : null]}
             numberOfLines={1}
           >
             {preview}
           </Text>
-          {unread ? <View style={styles.unreadDot} accessibilityLabel="Mensaje no leído" /> : null}
+          {unread ? (
+            <View
+              style={styles.unreadDot}
+              accessibilityLabel="Mensaje no leído"
+            />
+          ) : null}
         </View>
       </View>
     </Pressable>
@@ -310,7 +319,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
-  guestTitle: { ...typography.title, color: colors.textPrimary, textAlign: 'center' },
+  guestTitle: {
+    ...typography.title,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
   guestBody: {
     ...typography.body,
     color: colors.textSecondary,
@@ -325,7 +338,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   signupPrompt: { ...typography.caption, color: colors.textSecondary },
-  signupLink: { ...typography.caption, color: colors.primary, fontWeight: '600' },
+  signupLink: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: '600',
+  },
 
   searchBar: {
     flexDirection: 'row',
@@ -349,7 +366,11 @@ const styles = StyleSheet.create({
   },
 
   list: { paddingVertical: spacing.sm },
-  separator: { height: 1, backgroundColor: colors.border, marginHorizontal: spacing.base },
+  separator: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginHorizontal: spacing.base,
+  },
 
   row: {
     flexDirection: 'row',
@@ -361,10 +382,23 @@ const styles = StyleSheet.create({
   },
   rowPressed: { opacity: 0.92 },
   rowText: { flex: 1, gap: 2 },
-  rowHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  rowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   rowName: { ...typography.heading, color: colors.textPrimary, flex: 1 },
-  rowTime: { ...typography.caption, color: colors.textSecondary, marginLeft: spacing.sm },
-  rowSubheader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  rowTime: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginLeft: spacing.sm,
+  },
+  rowSubheader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
   rowPreview: { ...typography.caption, color: colors.textSecondary, flex: 1 },
   rowPreviewUnread: { color: colors.textPrimary, fontWeight: '600' },
   unreadDot: {
@@ -383,6 +417,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   skeletonRowText: { flex: 1, gap: 2 },
-  skeletonRowHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  skeletonRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   skeletonSpacerXs: { marginTop: spacing.xs },
 });

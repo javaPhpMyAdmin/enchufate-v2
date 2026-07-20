@@ -120,29 +120,22 @@ export function formatRelativeTime(iso: string): string {
   if (pastSec < 30) return 'recién';
   if (pastSec < 60) return 'hace un momento';
 
-  const rtf = new Intl.RelativeTimeFormat('es-UY', { numeric: 'always' });
-
+  // Manual Spanish relative-time strings — Intl.RelativeTimeFormat
+  // is NOT available in Hermes on Android, so we build the "hace N"
+  // prefix by hand. The abbreviations (min, h, d) match the design
+  // spec for tight list rows.
   if (pastSec < 3600) {
     const m = Math.round(pastSec / 60);
-    return rtf
-      .format(-m, 'minute')
-      .replace('minutos', 'min')
-      .replace('minuto', 'min');
+    return m === 1 ? 'hace 1 min' : `hace ${m} min`;
   }
   if (pastSec < 86400) {
     const h = Math.round(pastSec / 3600);
-    return rtf
-      .format(-h, 'hour')
-      .replace('horas', 'h')
-      .replace('hora', 'h');
+    return h === 1 ? 'hace 1 h' : `hace ${h} h`;
   }
   if (pastSec < 86400 * 7) {
     const d = Math.round(pastSec / 86400);
     if (d === 1) return 'ayer';
-    return rtf
-      .format(-d, 'day')
-      .replace('días', 'd')
-      .replace('día', 'd');
+    return `hace ${d} d`;
   }
   return formatDateTime(iso).split(',')[0]?.trim() ?? iso;
 }
@@ -184,20 +177,22 @@ export function formatRelativeTimeLong(iso: string | Date): string {
   if (pastSec < 30) return 'recién';
   if (pastSec < 60) return 'hace un momento';
 
-  const rtf = new Intl.RelativeTimeFormat('es-UY', { numeric: 'always' });
-
+  // Manual Spanish relative-time strings — Intl.RelativeTimeFormat
+  // is NOT available in Hermes on Android (see formatRelativeTime).
+  // This long variant uses full words (minutos, horas, días) instead
+  // of abbreviations, for wider contexts like tooltips.
   if (pastSec < 3600) {
     const m = Math.round(pastSec / 60);
-    return rtf.format(-m, 'minute');
+    return m === 1 ? 'hace 1 minuto' : `hace ${m} minutos`;
   }
   if (pastSec < 86400) {
     const h = Math.round(pastSec / 3600);
-    return rtf.format(-h, 'hour');
+    return h === 1 ? 'hace 1 hora' : `hace ${h} horas`;
   }
   if (pastSec < 86400 * 7) {
     const d = Math.round(pastSec / 86400);
     if (d === 1) return 'ayer';
-    return rtf.format(-d, 'day');
+    return d === 1 ? 'hace 1 día' : `hace ${d} días`;
   }
   return formatDateTime(typeof iso === 'string' ? iso : iso.toISOString())
     .split(',')[0]
