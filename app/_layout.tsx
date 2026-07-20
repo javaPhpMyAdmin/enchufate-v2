@@ -58,12 +58,22 @@ import {
   QUERY_CACHE_MAX_AGE_MS,
   asyncStoragePersister,
 } from '@/lib/queryPersister';
-import MapboxGL from '@rnmapbox/maps';
-
-// Set Mapbox access token before any map component renders.
-const mapboxToken = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
-if (mapboxToken) {
-  MapboxGL.setAccessToken(mapboxToken);
+// ── MapBox safe init ────────────────────────────────────────────
+// The import is wrapped so the entire layout never crashes if the
+// native module is missing (e.g. Expo Go, stale dev client, or
+// cold start from deep link before TurboModules register).
+let _mapboxReady = false;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const MapboxGL = require('@rnmapbox/maps').default;
+  const mapboxToken = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+  if (mapboxToken && MapboxGL?.setAccessToken) {
+    MapboxGL.setAccessToken(mapboxToken);
+    _mapboxReady = true;
+  }
+} catch {
+  // Native module not available — map screens will show a fallback.
+  console.warn('[boot] @rnmapbox/maps native module not available — map disabled');
 }
 
 export default function RootLayout() {
