@@ -9,7 +9,7 @@
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { MapboxGL, isMapboxAvailable } from '@/lib/mapbox';
+import { MapboxGL, isMapboxReady } from '@/lib/mapbox';
 import { ArrowUpRight } from 'lucide-react-native';
 
 import { Icon } from '@/components/atoms/Icon';
@@ -26,7 +26,7 @@ interface Props {
 }
 
 export default function ChargerMapSnippet({ lng, lat, id, onPress }: Props) {
-  if (!isMapboxAvailable || !MapboxGL) {
+  if (!isMapboxReady() || !MapboxGL) {
     return (
       <Pressable
         onPress={onPress}

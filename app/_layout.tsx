@@ -58,16 +58,7 @@ import {
   QUERY_CACHE_MAX_AGE_MS,
   asyncStoragePersister,
 } from '@/lib/queryPersister';
-// ── MapBox safe init ────────────────────────────────────────────
-// The wrapper uses require() with try/catch so the entire layout
-// never crashes if the native module is missing.
-import { MapboxGL, isMapboxAvailable } from '@/lib/mapbox';
-if (isMapboxAvailable && MapboxGL) {
-  const mapboxToken = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
-  if (mapboxToken) {
-    MapboxGL.setAccessToken(mapboxToken);
-  }
-}
+import { initMapbox } from '@/lib/mapbox';
 
 export default function RootLayout() {
   // Mounted for its side effects (subscribes to onAuthStateChange,
@@ -78,6 +69,10 @@ export default function RootLayout() {
   // ----- Boot side effects (Phase 8 polish) -----
   useEffect(() => {
     let cancelled = false;
+
+    // 0. MapBox init — must run after mount so the native bridge is
+    //    ready. Idempotent; safe to call on every mount.
+    initMapbox();
 
     // 1. Asset preloading — home hero + map pin. Best-effort; the
     //    screens still render via `require()` if the cache write

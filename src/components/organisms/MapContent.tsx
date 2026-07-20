@@ -10,7 +10,7 @@
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { MapboxGL, isMapboxAvailable } from '@/lib/mapbox';
+import { MapboxGL, isMapboxReady } from '@/lib/mapbox';
 import type { NativeSyntheticEvent } from 'react-native';
 import { SlidersHorizontal } from 'lucide-react-native';
 
@@ -53,7 +53,7 @@ export default function MapContent({
   sourceRef,
 }: MapContentProps) {
   // If the native module didn't load, show a placeholder.
-  if (!isMapboxAvailable || !MapboxGL) {
+  if (!isMapboxReady() || !MapboxGL) {
     return (
       <View style={[styles.root, styles.fallback]}>
         <Text style={styles.fallbackText}>
