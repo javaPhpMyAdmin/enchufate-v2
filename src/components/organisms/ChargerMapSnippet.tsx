@@ -3,16 +3,19 @@
  *
  * Extracted and loaded via dynamic import from [id].tsx to avoid
  * TurboModule crash on post-OAuth redirect.
+ *
+ * Uses safe MapBox wrapper — renders a placeholder if the native
+ * module is unavailable (Expo Go, stale build, cold start).
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import MapboxGL from '@rnmapbox/maps';
+import { MapboxGL, isMapboxAvailable } from '@/lib/mapbox';
 import { ArrowUpRight } from 'lucide-react-native';
 
 import { Icon } from '@/components/atoms/Icon';
 import { colors, radius, spacing, typography } from '@/theme';
 
-const MAPBOX_STYLE = MapboxGL.StyleURL.Street;
+const MAPBOX_STYLE = MapboxGL?.StyleURL?.Street ?? 'MapboxStandardStyleV8';
 const CARGADOR_SNIPPET_ICON = 'cargador-snippet';
 
 interface Props {
@@ -23,6 +26,21 @@ interface Props {
 }
 
 export default function ChargerMapSnippet({ lng, lat, id, onPress }: Props) {
+  if (!isMapboxAvailable || !MapboxGL) {
+    return (
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="link"
+        accessibilityLabel="Ver en el mapa"
+        style={styles.mapWrap}
+      >
+        <View style={styles.fallback}>
+          <Text style={styles.fallbackText}>Mapa no disponible</Text>
+        </View>
+      </Pressable>
+    );
+  }
+
   const geojson = {
     type: 'FeatureCollection' as const,
     features: [
@@ -83,6 +101,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: colors.surface,
   },
+  fallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fallbackText: { ...typography.body, color: colors.textSecondary },
   mapOverlay: {
     position: 'absolute',
     bottom: spacing.sm,

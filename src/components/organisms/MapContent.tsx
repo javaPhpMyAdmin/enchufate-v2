@@ -10,7 +10,7 @@
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import MapboxGL from '@rnmapbox/maps';
+import { MapboxGL, isMapboxAvailable } from '@/lib/mapbox';
 import type { NativeSyntheticEvent } from 'react-native';
 import { SlidersHorizontal } from 'lucide-react-native';
 
@@ -20,7 +20,7 @@ import { URUGUAY_FALLBACK } from '@/lib/location';
 import { colors, radius, spacing, typography } from '@/theme';
 
 // ── Constants ────────────────────────────────────────────────
-const MAPBOX_STYLE = MapboxGL.StyleURL.Street;
+const MAPBOX_STYLE = MapboxGL?.StyleURL?.Street ?? 'MapboxStandardStyleV8';
 const CARGADOR_ICON_ID = 'cargador';
 
 const INITIAL_CAMERA = {
@@ -52,6 +52,17 @@ export default function MapContent({
   cameraRef,
   sourceRef,
 }: MapContentProps) {
+  // If the native module didn't load, show a placeholder.
+  if (!isMapboxAvailable || !MapboxGL) {
+    return (
+      <View style={[styles.root, styles.fallback]}>
+        <Text style={styles.fallbackText}>
+          El mapa no está disponible en este dispositivo.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
       <MapboxGL.MapView
@@ -163,6 +174,8 @@ export default function MapContent({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  fallback: { alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
+  fallbackText: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   topBar: {
     position: 'absolute',
     top: 0,
