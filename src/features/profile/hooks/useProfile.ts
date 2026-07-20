@@ -1,13 +1,6 @@
 /**
  * useProfile — fetch the current user's profile by id.
  *
- * **Phase 5 (this commit)**: returns the hardcoded `MOCK_PROFILE`
- * with a 200ms artificial delay so the screen can exercise its
- * loading state. The hook is wired up to read the `userId` from
- * `useSession()` so Phase 6 only needs to swap the `queryFn` body
- * for `.from('profiles').select().eq('id', uid).maybeSingle()` —
- * the query key, signature, and call sites stay identical.
- *
  * `enabled: Boolean(userId)` keeps the query idle when there is no
  * signed-in user, so the screen can render the guest EmptyState
  * without triggering a fetch.
@@ -15,19 +8,9 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import { AppError, normalizeSupabaseError } from '@/lib/error';
+import { supabase } from '@/lib/supabase';
 
 import type { Profile } from '../types';
-
-const MOCK_PROFILE: Profile = {
-  id: 'mock-uid',
-  email: 'demo@enchufate.uy',
-  full_name: 'Usuario Demo',
-  avatar_url: null,
-  // Picked to land in March 2024 so the "Miembro desde marzo de
-  // 2024" copy is visible in the spec scenario.
-  created_at: '2024-03-15T12:00:00Z',
-  updated_at: '2024-03-15T12:00:00Z',
-};
 
 const QUERY_KEY = (uid: string) => ['profile', uid] as const;
 
@@ -51,9 +34,26 @@ export function useProfile(
           retryable: false,
         });
       }
-      // Simulate network latency so the LoadingState is visible.
-      await new Promise((r) => setTimeout(r, 200));
-      return MOCK_PROFILE;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) {
+        throw normalizeSupabaseError(error);
+      }
+
+      if (!data) {
+        throw new AppError({
+          code: 'not_found',
+          message: 'Profile not found',
+          userMessage: 'No encontramos tu perfil.',
+          retryable: true,
+        });
+      }
+
+      return data as Profile;
     },
     staleTime: 60_000,
   });

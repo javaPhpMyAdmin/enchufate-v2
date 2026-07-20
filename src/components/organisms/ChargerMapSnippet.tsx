@@ -1,16 +1,18 @@
 /**
  * ChargerMapSnippet — small Mapbox preview used in charger detail.
  *
- * CRITICAL: All @rnmapbox/maps usage is via dynamic import() inside
- * useEffect. Shows a placeholder when the native module is unavailable.
+ * Loaded via dynamic import from [id].tsx. Uses STATIC import
+ * of @rnmapbox/maps (nested dynamic imports cause Metro errors).
  */
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import MapboxGL from '@rnmapbox/maps';
 import { ArrowUpRight } from 'lucide-react-native';
 
 import { Icon } from '@/components/atoms/Icon';
 import { colors, radius, spacing, typography } from '@/theme';
 
+const MAPBOX_STYLE = MapboxGL.StyleURL.Street;
 const CARGADOR_SNIPPET_ICON = 'cargador-snippet';
 
 interface Props {
@@ -21,29 +23,6 @@ interface Props {
 }
 
 export default function ChargerMapSnippet({ lng, lat, id, onPress }: Props) {
-  const [MapboxGL, setMapboxGL] = useState<any>(null);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const mod = await import('@rnmapbox/maps');
-        if (cancelled) return;
-        const gl = mod.default ?? mod;
-        const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
-        if (token && gl?.setAccessToken) {
-          gl.setAccessToken(token);
-        }
-        setMapboxGL(() => gl);
-        setReady(true);
-      } catch {
-        if (!cancelled) setReady(true);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
   const geojson = {
     type: 'FeatureCollection' as const,
     features: [
@@ -54,23 +33,6 @@ export default function ChargerMapSnippet({ lng, lat, id, onPress }: Props) {
       },
     ],
   };
-
-  if (!ready || !MapboxGL) {
-    return (
-      <Pressable
-        onPress={onPress}
-        accessibilityRole="link"
-        accessibilityLabel="Ver en el mapa"
-        style={styles.mapWrap}
-      >
-        <View style={styles.fallback}>
-          <Text style={styles.fallbackText}>Mapa no disponible</Text>
-        </View>
-      </Pressable>
-    );
-  }
-
-  const MAPBOX_STYLE = MapboxGL.StyleURL?.Street ?? 'MapboxStandardStyleV8';
 
   return (
     <Pressable
@@ -121,12 +83,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: colors.surface,
   },
-  fallback: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fallbackText: { ...typography.body, color: colors.textSecondary },
   mapOverlay: {
     position: 'absolute',
     bottom: spacing.sm,

@@ -54,7 +54,7 @@ export function useGoogleOAuth(): UseGoogleOAuthResult {
     mutationFn: async () => {
       // Use the same deep-link URL the rest of the app uses so the
       // OS handles the redirect consistently.
-      const redirectTo = Linking.createURL('/(tabs)');
+      const redirectTo = 'enchufate://(tabs)';
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -122,12 +122,13 @@ export function useGoogleOAuth(): UseGoogleOAuthResult {
         const refreshToken = params.get('refresh_token');
         if (accessToken && refreshToken) {
           // eslint-disable-next-line no-console
-          console.warn('[useGoogleOAuth] Implicit tokens received, setting session...');
-          const { error: sessionError } =
-            await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
+          console.warn(
+            '[useGoogleOAuth] Implicit tokens received, setting session...',
+          );
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
           if (sessionError) throw normalizeSupabaseError(sessionError);
           return; // ← session created, onAuthStateChange will fire
         }
@@ -139,8 +140,8 @@ export function useGoogleOAuth(): UseGoogleOAuthResult {
         // eslint-disable-next-line no-console
         console.warn(
           '[useGoogleOAuth] Success result but no tokens in URL — ' +
-          'session may be handled by boot-time deep link handler. URL: ' +
-          result.url.slice(0, 120),
+            'session may be handled by boot-time deep link handler. URL: ' +
+            result.url.slice(0, 120),
         );
       }
     },
