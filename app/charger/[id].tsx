@@ -38,6 +38,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
+  AlertTriangle,
   Calendar,
   ChevronLeft,
   ChevronRight,
@@ -134,6 +135,8 @@ export default function ChargerDetailScreen() {
   const [mapApps, setMapApps] = useState<
     Array<{ label: string; url: string; icon: any; color: string }>
   >([]);
+  const [reservationError, setReservationError] = useState<string | null>(null);
+  const errorSheetRef = useRef<BottomSheetModal>(null);
 
   const onReservarPress = useCallback(() => {
     if (!session) {
@@ -146,7 +149,6 @@ export default function ChargerDetailScreen() {
   const onReserveDuration = useCallback(
     async (minutes: number, label: string) => {
       if (!chargerId) return;
-      sheetRef.current?.dismiss();
       try {
         await createReservation.create({
           chargerId,
@@ -154,12 +156,14 @@ export default function ChargerDetailScreen() {
           endAt: null,
           horarioACoordinar: `${label} — coordinar con el anfitrión`,
         });
-        // Navigate to messages tab — the conversation was created
-        // by the trigger and will appear in the list.
+        sheetRef.current?.dismiss();
         router.push('/(tabs)/messages' as never);
-      } catch {
-        // Error is captured in createReservation.error;
-        // the sheet stays dismissable so the user can retry.
+      } catch (err: any) {
+        // eslint-disable-next-line no-console
+        console.error('[Reserve]', err);
+        const msg = err?.userMessage ?? err?.message ?? 'Ocurrió un error inesperado.';
+        setReservationError(msg);
+        errorSheetRef.current?.present();
       }
     },
     [chargerId, createReservation, router],
@@ -329,7 +333,7 @@ export default function ChargerDetailScreen() {
       {/* Reservation duration picker sheet */}
       <BottomSheetModal
         ref={sheetRef}
-        snapPoints={['40%']}
+        snapPoints={['50%']}
         enableDynamicSizing={false}
         backdropComponent={(p) => (
           <BottomSheetBackdrop {...p} appearsOnIndex={0} disappearsOnIndex={-1} />
@@ -404,6 +408,34 @@ export default function ChargerDetailScreen() {
               </Pressable>
             );
           })}
+        </View>
+      </BottomSheetModal>
+
+      {/* Error sheet */}
+      <BottomSheetModal
+        ref={errorSheetRef}
+        snapPoints={['35%']}
+        enableDynamicSizing={false}
+        backdropComponent={(p) => (
+          <BottomSheetBackdrop {...p} appearsOnIndex={0} disappearsOnIndex={-1} />
+        )}
+        backgroundStyle={styles.sheetBg}
+      >
+        <View style={styles.errorSheetContent}>
+          <View style={styles.errorIconWrap}>
+            <AlertTriangle size={40} color="#E53935" strokeWidth={1.8} />
+          </View>
+          <Text style={styles.errorTitle}>No se pudo crear la reserva</Text>
+          <Text style={styles.errorBody}>
+            {reservationError ?? 'Ocurrió un error inesperado. Intentá de nuevo.'}
+          </Text>
+          <Button
+            label="Entendido"
+            variant="secondary"
+            fullWidth
+            onPress={() => errorSheetRef.current?.dismiss()}
+            style={styles.errorButton}
+          />
         </View>
       </BottomSheetModal>
     </View>
@@ -585,6 +617,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   appLabel: { ...typography.body, color: colors.textPrimary, flex: 1, fontWeight: '500' },
+
+  // ----- Error sheet -----
+  errorSheetContent: {
+    padding: spacing.lg,
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  errorIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#FDECEA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorTitle: { ...typography.heading, color: colors.textPrimary, textAlign: 'center' },
+  errorBody: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
+  errorButton: { marginTop: spacing.sm },
 
   // ----- Skeleton (loading) -----
   backButtonPlaceholder: { width: 24, height: 24 },
