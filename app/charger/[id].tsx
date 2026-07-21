@@ -61,11 +61,19 @@ import { Skeleton } from '@/components/molecules/Skeleton';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { useCharger } from '@/features/chargers/hooks/useCharger';
 import { CONNECTOR_LABEL } from '@/features/chargers/types';
+import { useCreateReservation } from '@/features/reservations/hooks/useCreateReservation';
 import { formatPrice } from '@/lib/format';
 import { colors, radius, spacing, typography } from '@/theme';
 
 const PLACEHOLDER_PHOTO = require('@/../assets/icons/cargador.png');
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const DURATION_OPTIONS = [
+  { minutes: 30, label: '30 minutos' },
+  { minutes: 60, label: '1 hora' },
+  { minutes: 120, label: '2 horas' },
+  { minutes: 240, label: '4 horas' },
+];
 
 export default function ChargerDetailScreen() {
   const router = useRouter();
@@ -78,6 +86,7 @@ export default function ChargerDetailScreen() {
   const sheetRef = useRef<BottomSheetModal>(null);
   const directionsSheetRef = useRef<BottomSheetModal>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
+  const createReservation = useCreateReservation();
 
   const onOpenInMaps = useCallback(() => {
     const data = charger.data;
@@ -133,6 +142,28 @@ export default function ChargerDetailScreen() {
     }
     sheetRef.current?.present();
   }, [session, router, chargerId]);
+
+  const onReserveDuration = useCallback(
+    async (minutes: number, label: string) => {
+      if (!chargerId) return;
+      sheetRef.current?.dismiss();
+      try {
+        await createReservation.create({
+          chargerId,
+          startAt: null,
+          endAt: null,
+          horarioACoordinar: `${label} — coordinar con el anfitrión`,
+        });
+        // Navigate to messages tab — the conversation was created
+        // by the trigger and will appear in the list.
+        router.push('/(tabs)/messages' as never);
+      } catch {
+        // Error is captured in createReservation.error;
+        // the sheet stays dismissable so the user can retry.
+      }
+    },
+    [chargerId, createReservation, router],
+  );
 
   // Reset photo index when the route id changes.
   useEffect(() => {
@@ -295,10 +326,10 @@ export default function ChargerDetailScreen() {
         <Button label="Reservar" variant="primary" fullWidth size="lg" onPress={onReservarPress} />
       </View>
 
-      {/* Placeholder bottom sheet — real picker lands in Phase 7 */}
+      {/* Reservation duration picker sheet */}
       <BottomSheetModal
         ref={sheetRef}
-        snapPoints={['35%']}
+        snapPoints={['40%']}
         enableDynamicSizing={false}
         backdropComponent={(p) => (
           <BottomSheetBackdrop {...p} appearsOnIndex={0} disappearsOnIndex={-1} />
@@ -306,17 +337,34 @@ export default function ChargerDetailScreen() {
         backgroundStyle={styles.sheetBg}
       >
         <View style={styles.sheetContent}>
-          <Text style={styles.sheetTitle}>Reservar este cargador</Text>
+          <Text style={styles.sheetTitle}>¿Cuánto tiempo necesitás?</Text>
           <Text style={styles.sheetBody}>
-            Próximamente vas a poder elegir día, hora y duración desde acá.
+            Elegí la duración y el anfitrión te confirma por chat.
           </Text>
-          <Button
-            label="Cerrar"
-            variant="secondary"
-            fullWidth
-            onPress={() => sheetRef.current?.dismiss()}
-            style={styles.sheetClose}
-          />
+          {DURATION_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt.minutes}
+              onPress={() => onReserveDuration(opt.minutes, opt.label)}
+              disabled={createReservation.isPending}
+              style={({ pressed }) => [
+                styles.durationRow,
+                pressed && styles.durationRowPressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Reservar ${opt.label}`}
+            >
+              <Text style={styles.durationLabel}>{opt.label}</Text>
+              {createReservation.isPending && (
+                <Text style={styles.durationPending}>…</Text>
+              )}
+              <ChevronRight size={18} color={colors.textSecondary} />
+            </Pressable>
+          ))}
+          {createReservation.error ? (
+            <Text style={styles.durationError}>
+              {createReservation.error.userMessage}
+            </Text>
+          ) : null}
         </View>
       </BottomSheetModal>
 
@@ -505,6 +553,19 @@ const styles = StyleSheet.create({
   sheetTitle: { ...typography.title, color: colors.textPrimary },
   sheetBody: { ...typography.body, color: colors.textSecondary },
   sheetClose: { marginTop: spacing.sm },
+
+  // ----- Duration picker -----
+  durationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.button,
+  },
+  durationRowPressed: { backgroundColor: colors.surface },
+  durationLabel: { ...typography.body, color: colors.textPrimary, flex: 1, fontWeight: '500' },
+  durationPending: { ...typography.body, color: colors.primary, marginRight: spacing.sm },
+  durationError: { ...typography.body, color: '#E53935', marginTop: spacing.sm },
 
   // ----- Directions chooser -----
   appRow: {
