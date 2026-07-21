@@ -1,27 +1,22 @@
 /**
  * useConversations — fetch the signed-in user's 1:1 conversation list.
  *
- * **Phase 5 (this commit)**: returns the hardcoded
- * `MOCK_CONVERSATIONS` with a 200ms artificial delay. Phase 7
- * swaps the `queryFn` body for
- * `.from('conversations').select('*, renter:profiles!renter_id(*),
- * host:profiles!host_id(*), charger:chargers(*)').or(\`renter_id.eq.
- * ${uid},host_id.eq.${uid}\`).order('last_message_at', { ascending:
- * false })`. The hook signature, query key, and call sites stay
- * identical.
+ * Queries `public.conversations` with joins to `profiles` and
+ * `chargers` so the UI gets denormalized rows in a single round-trip.
+ * The `.or()` filter returns conversations where the current user is
+ * either the renter or the host.
  *
  * The `CHAT` feature flag gates the entire hook: when the flag is
  * off, the hook returns an empty array and `isLoading` flips to
  * `false` immediately, so the screen can render its empty state
- * without a fetch round-trip. This is the v2.1 flag from
- * `src/lib/features.ts` — kept on in MVP per the design.
+ * without a fetch round-trip.
  */
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
-import { AppError } from '@/lib/error';
+import { AppError, normalizeSupabaseError } from '@/lib/error';
 import { isFeatureEnabled } from '@/lib/features';
+import { supabase } from '@/lib/supabase';
 
-import { MOCK_CONVERSATIONS } from '../data/mockConversations';
 import type { Conversation } from '../types';
 
 const QUERY_KEY = (uid: string) => ['conversations', uid] as const;
@@ -52,11 +47,40 @@ export function useConversations(
         });
       }
       if (!isFeatureEnabled('CHAT')) {
-        // Feature off — return empty without hitting the (mock) data layer.
         return [];
       }
-      await new Promise((r) => setTimeout(r, 200));
-      return MOCK_CONVERSATIONS;
+
+      const { data, error } = await supabase
+        .from('conversations')
+        .select(`
+          id, charger_id, renter_id, host_id, last_message_at,
+          renter:profiles!renter_id(id, full_name, avatar_url),
+          host:profiles!host_id(id, full_name, avatar_url),
+          charger:chargers(id, title)
+        `)
+        .or(`renter_id.eq.${userId},host_id.eq.${userId}`)
+        .order('last_message_at', { ascending: false });
+
+      if (error) throw normalizeSupabaseError(error);
+
+      // Map Supabase join shape to our denormalized Conversation type.
+      return (data ?? []).map((row) => ({
+        id: row.id,
+        charger_id: row.charger_id,
+        charger_title: (row.charger as any)?.title ?? '',
+        renter_id: row.renter_id,
+        renter_name: (row.renter as any)?.full_name ?? '',
+        renter_avatar_url: (row.renter as any)?.avatar_url ?? null,
+        host_id: row.host_id,
+        host_name: (row.host as any)?.full_name ?? '',
+        host_avatar_url: (row.host as any)?.avatar_url ?? null,
+        last_message_at: row.last_message_at,
+        // Denormalized fields not available from DB yet — will be
+        // populated by the edge function or trigger in a future phase.
+        last_message_body: '',
+        last_message_kind: 'user' as const,
+        unread_count: 0,
+      }));
     },
     staleTime: 15_000,
   });

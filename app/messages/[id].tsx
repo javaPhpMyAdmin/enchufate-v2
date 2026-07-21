@@ -60,7 +60,7 @@ export default function ThreadScreen() {
   const userId = session?.user.id ?? null;
   const conversations = useConversations(userId);
   const messages = useMessages(conversationId);
-  const sendMessage = useSendMessage(conversationId ?? 'noop');
+  const sendMessage = useSendMessage(conversationId ?? 'noop', userId);
 
   const [text, setText] = useState('');
 

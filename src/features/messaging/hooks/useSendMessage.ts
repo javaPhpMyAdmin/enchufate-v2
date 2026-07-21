@@ -2,16 +2,14 @@
  * useSendMessage — optimistic mutation that appends a user message
  * to a conversation thread.
  *
- * Three lifecycle phases (per the messaging spec's "Sending is
- * Offline-Safe" requirement):
+ * Three lifecycle phases:
  *
  *   1. **`onMutate`** — cancel in-flight queries for the
  *      conversation, snapshot the previous message list, then
  *      append a `pending: true` optimistic message so the user
  *      sees their text appear instantly with a "sending" indicator.
  *
- *   2. **`mutationFn`** — Phase 5: just generate a stable id and
- *      resolve. Phase 7: real `.from('messages').insert(...)` call
+ *   2. **`mutationFn`** — real `.from('messages').insert(...)` call
  *      via the `messages_insert_user` RLS policy.
  *
  *   3. **`onError` / `onSettled`** — on error, restore the
@@ -21,8 +19,9 @@
  */
 import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 
-import { AppError } from '@/lib/error';
+import { AppError, normalizeSupabaseError } from '@/lib/error';
 import { isFeatureEnabled } from '@/lib/features';
+import { supabase } from '@/lib/supabase';
 
 import type { Message } from '../types';
 
@@ -38,6 +37,7 @@ interface MutationContext {
 
 export function useSendMessage(
   conversationId: string,
+  userId: string | null | undefined,
 ): UseMutationResult<Message, AppError, string, MutationContext> & UseSendMessageResult {
   const queryClient = useQueryClient();
 
@@ -51,24 +51,29 @@ export function useSendMessage(
           retryable: false,
         });
       }
-      // Phase 5: mock insert. Phase 7: replace with
-      //   const { data, error } = await supabase
-      //     .from('messages')
-      //     .insert({ conversation_id: conversationId, sender_id: uid, body, kind: 'user' })
-      //     .select()
-      //     .single();
-      //   if (error) throw normalizeSupabaseError(error);
-      //   return data;
-      await new Promise((r) => setTimeout(r, 100));
-      return {
-        id: `local-${Date.now()}`,
-        conversation_id: conversationId,
-        sender_id: 'mock-uid',
-        body,
-        kind: 'user',
-        pending: false,
-        created_at: new Date().toISOString(),
-      };
+      if (!userId) {
+        throw new AppError({
+          code: 'no_user',
+          message: 'useSendMessage called without a user id',
+          userMessage: 'Necesitás iniciar sesión para enviar mensajes.',
+          isAuthError: true,
+          retryable: false,
+        });
+      }
+
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          sender_id: userId,
+          body,
+          kind: 'user',
+        })
+        .select()
+        .single();
+
+      if (error) throw normalizeSupabaseError(error);
+      return data as Message;
     },
     onMutate: async (body) => {
       const key = ['messages', conversationId] as const;
@@ -77,7 +82,7 @@ export function useSendMessage(
       const optimistic: Message = {
         id: `pending-${Date.now()}`,
         conversation_id: conversationId,
-        sender_id: 'mock-uid',
+        sender_id: userId ?? null,
         body,
         kind: 'user',
         pending: true,
