@@ -25,7 +25,7 @@
  *      only reliable hook here; the iOS swipe-back gesture is
  *      a known limitation that's documented in the spec.
  */
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { ActivityIndicator, Alert, BackHandler, StyleSheet, View } from 'react-native';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -88,26 +88,37 @@ export default function PublishLayout() {
     }
   }, [session, isLoading, router]);
 
-  // ----- Step → route sync -----
-  // When the user taps Siguiente / Atrás, the store mutates `step`
-  // and this effect pushes the matching route. Conversely, if the
-  // user deep-links to /publish/2-location directly, we sync the
-  // store's `step` to the route so the progress bar is correct.
+  // ----- Step ↔ route sync -----
+  // Two effects with a guard to prevent ping-pong:
+  //   - Step → route: when nextStep/prevStep changes `step`, navigate.
+  //   - Route → step: when deep-link changes `pathname`, sync step.
+  // The guard (navigatingFromStepRef) tells route→step to skip
+  // when the pathname change was caused by step→route navigation.
+  const navigatingFromStepRef = useRef(false);
+
+  // Step → route: navigate when the store's step changes
   useEffect(() => {
-    const entry = Object.entries(STEP_ROUTE).find(([, route]) => route === pathname);
-    if (entry) {
-      const [stepStr] = entry;
-      const routeStep = Number(stepStr) as PublishStep;
-      if (routeStep !== step) setStep(routeStep);
-      return;
-    }
-    // Pathname doesn't match a known step (e.g. before the user
-    // lands on a step route). Snap to the current store step.
     const expected = STEP_ROUTE[step];
     if (expected && pathname !== expected) {
+      navigatingFromStepRef.current = true;
       router.replace(expected as never);
     }
-  }, [pathname, step, setStep, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
+  // Route → step: sync step from pathname (for deep links)
+  useEffect(() => {
+    if (navigatingFromStepRef.current) {
+      navigatingFromStepRef.current = false;
+      return;
+    }
+    const entry = Object.entries(STEP_ROUTE).find(([, r]) => r === pathname);
+    if (entry) {
+      const routeStep = Number(entry[0]) as PublishStep;
+      if (routeStep !== step) setStep(routeStep);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   // ----- Exit guard (Phase 8 polish) -----
   // Hardware back press on Android (and on iOS hardware-keyboard

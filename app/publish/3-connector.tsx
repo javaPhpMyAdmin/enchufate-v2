@@ -36,7 +36,6 @@ import {
   usePublishStore,
   validateStep3,
   type PublishConnectorType,
-  type PublishStep,
 } from '@/stores/publishStore';
 import { colors, radius, spacing, typography } from '@/theme';
 
@@ -78,13 +77,6 @@ function formatPowerInput(n: number | null): string {
 
 export default function PublishStep3Connector(): React.JSX.Element {
   const insets = useSafeAreaInsets();
-
-  // On mount, make sure the store's `step` matches the route. The
-  // layout's useEffect also does this; the screen-level sync keeps
-  // things correct if the user lands here via a stale deep link.
-  const step = usePublishStore((s) => s.step);
-  const setStep = usePublishStore((s) => s.setStep);
-  if (step !== (3 as PublishStep)) setStep(3);
 
   const connector_type = usePublishStore((s) => s.connector_type);
   const power_kw = usePublishStore((s) => s.power_kw);

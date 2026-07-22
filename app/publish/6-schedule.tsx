@@ -33,7 +33,6 @@ import {
   PUBLISH_DAY_LABELS,
   usePublishStore,
   validateStep6,
-  type PublishStep,
 } from '@/stores/publishStore';
 import { colors, radius, spacing, typography } from '@/theme';
 import type { DayKey, DayWindow } from '@/features/chargers/types';
@@ -63,13 +62,6 @@ function windowsForMode(
 
 export default function PublishStep6Schedule(): React.JSX.Element {
   const insets = useSafeAreaInsets();
-
-  // On mount, make sure the store's `step` matches the route. The
-  // layout's useEffect also does this; the screen-level sync keeps
-  // things correct if the user lands here via a stale deep link.
-  const step = usePublishStore((s) => s.step);
-  const setStep = usePublishStore((s) => s.setStep);
-  if (step !== (6 as PublishStep)) setStep(6);
 
   const schedule = usePublishStore((s) => s.schedule);
   const setDaySchedule = usePublishStore((s) => s.setDaySchedule);

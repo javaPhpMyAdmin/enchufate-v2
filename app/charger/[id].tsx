@@ -208,7 +208,7 @@ export default function ChargerDetailScreen() {
   }
 
   const c = charger.data;
-  const photos = c.photos.length > 0 ? c.photos : [null];
+  const photos = c.photos?.length > 0 ? c.photos : [null];
   const total = photos.length;
   const memberSince = new Intl.DateTimeFormat('es-UY', {
     month: 'long',

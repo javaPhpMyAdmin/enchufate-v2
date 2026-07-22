@@ -28,7 +28,6 @@ import { Input } from '@/components/atoms/Input';
 import {
   usePublishStore,
   validateStep1,
-  type PublishStep,
 } from '@/stores/publishStore';
 import { colors, spacing, typography } from '@/theme';
 
@@ -39,14 +38,6 @@ const DESCRIPTION_MAX = 500;
 
 export default function PublishStep1Name(): React.JSX.Element {
   const insets = useSafeAreaInsets();
-
-  // On mount, make sure the store's `step` matches the route. The
-  // layout's useEffect also does this, but a second sync here keeps
-  // the screen correct if the user lands on it via a stale link
-  // (e.g. notification tap from a previous session).
-  const step = usePublishStore((s) => s.step);
-  const setStep = usePublishStore((s) => s.setStep);
-  if (step !== (1 as PublishStep)) setStep(1);
 
   const name = usePublishStore((s) => s.name);
   const description = usePublishStore((s) => s.description);

@@ -31,18 +31,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { usePublishStore, PUBLISH_RULES_MAX, type PublishStep } from '@/stores/publishStore';
+import { usePublishStore, PUBLISH_RULES_MAX } from '@/stores/publishStore';
 import { colors, radius, spacing, typography } from '@/theme';
 
 export default function PublishStep7Rules(): React.JSX.Element {
   const insets = useSafeAreaInsets();
-
-  // On mount, make sure the store's `step` matches the route. The
-  // layout's useEffect also does this; the screen-level sync keeps
-  // things correct if the user lands here via a stale deep link.
-  const step = usePublishStore((s) => s.step);
-  const setStep = usePublishStore((s) => s.setStep);
-  if (step !== (7 as PublishStep)) setStep(7);
 
   const rules = usePublishStore((s) => s.rules);
   const setRules = usePublishStore((s) => s.setRules);

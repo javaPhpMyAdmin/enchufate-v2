@@ -51,7 +51,6 @@ import {
 import {
   usePublishStore,
   type PublishLocation,
-  type PublishStep,
 } from '@/stores/publishStore';
 import { colors, radius, spacing, typography } from '@/theme';
 
@@ -69,13 +68,6 @@ function coordsAsAddress(lat: number, lng: number): string {
 
 export default function PublishStep2Location(): React.JSX.Element {
   const insets = useSafeAreaInsets();
-
-  // On mount, make sure the store's `step` matches the route. The
-  // layout's useEffect also does this; the screen-level sync keeps
-  // things correct if the user lands here via a stale deep link.
-  const step = usePublishStore((s) => s.step);
-  const setStep = usePublishStore((s) => s.setStep);
-  if (step !== (2 as PublishStep)) setStep(2);
 
   const location = usePublishStore((s) => s.location);
   const setLocation = usePublishStore((s) => s.setLocation);

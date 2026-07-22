@@ -33,7 +33,6 @@ import { Input } from '@/components/atoms/Input';
 import {
   usePublishStore,
   validateStep5,
-  type PublishStep,
 } from '@/stores/publishStore';
 import { colors, radius, spacing, typography } from '@/theme';
 
@@ -71,13 +70,6 @@ function formatPriceInput(n: number | null): string {
 
 export default function PublishStep5Pricing(): React.JSX.Element {
   const insets = useSafeAreaInsets();
-
-  // On mount, make sure the store's `step` matches the route. The
-  // layout's useEffect also does this; the screen-level sync keeps
-  // things correct if the user lands here via a stale deep link.
-  const step = usePublishStore((s) => s.step);
-  const setStep = usePublishStore((s) => s.setStep);
-  if (step !== (5 as PublishStep)) setStep(5);
 
   const pricing = usePublishStore((s) => s.pricing);
   const setPricePerHour = usePublishStore((s) => s.setPricePerHour);

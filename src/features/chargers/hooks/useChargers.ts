@@ -1,30 +1,13 @@
 /**
  * useChargers — TanStack Query hook for the charger list.
- *
- * **Phase 4 (this commit)**: returns the hardcoded `MOCK_CHARGERS`
- * array from `../data/mockChargers` with a 200ms artificial delay
- * to simulate network latency and exercise the loading state. This
- * lets the user preview the Mapa + Inicio surfaces in Expo Go
- * without a fresh Supabase anon key (the V1 key was revoked; the
- * new V2 key is still pending — see `security/enchufate-v2-blocked-
- * on-key`).
- *
- * **Phase 6 (next)**: replace the `queryFn` body with
- * `supabase.from('chargers').select('*').eq('status', 'active')`
- * (RLS will scope to public + own). The hook signature, query key,
- * and `filters` plumbing stay identical so the call sites in the
- * map and list screens don't change.
- *
- * The optional `filters` argument is currently a no-op (the mock
- * returns every charger) but it IS included in the query key so
- * when filters change, the cache key changes too — this means
- * Phase 6's real queryFn will trigger a refetch automatically as
- * soon as the filters are wired in, with zero call-site changes.
+ * Queries real Supabase data filtered by active status.
  */
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
+import { normalizeSupabaseError } from '@/lib/error';
+import { supabase } from '@/lib/supabase';
+
 import type { Charger } from '../types';
-import { MOCK_CHARGERS } from '../data/mockChargers';
 import type { MapFilters } from '@/stores/filterStore';
 
 export interface UseChargersResult {
@@ -48,10 +31,14 @@ export function useChargers(
   return useQuery<Charger[], Error>({
     queryKey: filters ? [...QUERY_KEY_ROOT, filters] : QUERY_KEY_ROOT,
     queryFn: async () => {
-      // Simulate network latency so the LoadingState atom is visible
-      // in the Mapa screen preview.
-      await new Promise((r) => setTimeout(r, 200));
-      return MOCK_CHARGERS;
+      const { data, error } = await supabase
+        .from('chargers')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (error) throw normalizeSupabaseError(error);
+      return (data ?? []) as unknown as Charger[];
     },
     staleTime: 30_000,
   });

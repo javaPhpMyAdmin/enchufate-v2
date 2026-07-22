@@ -50,7 +50,6 @@ import {
   PUBLISH_PHOTOS_MAX,
   usePublishStore,
   validateStep4,
-  type PublishStep,
 } from '@/stores/publishStore';
 import { colors, radius, spacing, typography } from '@/theme';
 
@@ -59,13 +58,6 @@ const GRID_GAP = spacing.sm;
 
 export default function PublishStep4Photos(): React.JSX.Element {
   const insets = useSafeAreaInsets();
-
-  // On mount, make sure the store's `step` matches the route. The
-  // layout's useEffect also does this; the screen-level sync keeps
-  // things correct if the user lands here via a stale deep link.
-  const step = usePublishStore((s) => s.step);
-  const setStep = usePublishStore((s) => s.setStep);
-  if (step !== (4 as PublishStep)) setStep(4);
 
   const photos = usePublishStore((s) => s.photos);
   const setPhotos = usePublishStore((s) => s.setPhotos);

@@ -1,24 +1,12 @@
 /**
  * useMyChargers — chargers owned by the current user.
- *
- * **Phase 5 (this commit)**: returns the hardcoded `MOCK_MY_CHARGERS`
- * array. The query key includes the `userId` so when Phase 6 swaps
- * in `.from('chargers').select().eq('owner_id', uid).eq('status',
- * 'active')` the cache invalidates correctly on sign-in / sign-out
- * and when the user publishes a new charger (the publish wizard
- * calls `queryClient.invalidateQueries({ queryKey: ['my-chargers',
- * uid] })` on success).
- *
- * `staleTime: 30_000` matches the global default; the per-query
- * override is here so future tweaks (e.g. realtime invalidation on
- * charger `UPDATE`) only need to touch one file.
+ * Queries real Supabase data filtered by owner_id.
  */
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import type { Charger } from '@/features/chargers/types';
-import { AppError } from '@/lib/error';
-
-import { MOCK_MY_CHARGERS } from '../data/mockMyChargers';
+import { AppError, normalizeSupabaseError } from '@/lib/error';
+import { supabase } from '@/lib/supabase';
 
 const QUERY_KEY = (uid: string) => ['my-chargers', uid] as const;
 
@@ -39,8 +27,15 @@ export function useMyChargers(
           retryable: false,
         });
       }
-      await new Promise((r) => setTimeout(r, 200));
-      return MOCK_MY_CHARGERS;
+
+      const { data, error } = await supabase
+        .from('chargers')
+        .select('*')
+        .eq('owner_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw normalizeSupabaseError(error);
+      return (data ?? []) as unknown as Charger[];
     },
     staleTime: 30_000,
   });
