@@ -87,34 +87,40 @@ export type Database = {
           charger_id: string
           created_at: string
           host_id: string
+          host_unread_count: number
           id: string
           last_message_at: string
           last_message_body: string | null
           last_message_kind: Database["public"]["Enums"]["message_kind"] | null
           last_message_sender_id: string | null
           renter_id: string
+          renter_unread_count: number
         }
         Insert: {
           charger_id: string
           created_at?: string
           host_id: string
+          host_unread_count?: number
           id?: string
           last_message_at?: string
           last_message_body?: string | null
           last_message_kind?: Database["public"]["Enums"]["message_kind"] | null
           last_message_sender_id?: string | null
           renter_id: string
+          renter_unread_count?: number
         }
         Update: {
           charger_id?: string
           created_at?: string
           host_id?: string
+          host_unread_count?: number
           id?: string
           last_message_at?: string
           last_message_body?: string | null
           last_message_kind?: Database["public"]["Enums"]["message_kind"] | null
           last_message_sender_id?: string | null
           renter_id?: string
+          renter_unread_count?: number
         }
         Relationships: [
           {

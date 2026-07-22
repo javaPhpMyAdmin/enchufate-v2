@@ -55,6 +55,7 @@ export function useConversations(
         .select(`
           id, charger_id, renter_id, host_id, last_message_at,
           last_message_body, last_message_kind,
+          host_unread_count, renter_unread_count,
           renter:profiles!renter_id(id, full_name, avatar_url),
           host:profiles!host_id(id, full_name, avatar_url),
           charger:chargers(id, title)
@@ -78,7 +79,9 @@ export function useConversations(
         last_message_at: row.last_message_at,
         last_message_body: row.last_message_body ?? '',
         last_message_kind: (row.last_message_kind ?? 'user') as MessageKind,
-        unread_count: 0, // TODO: implement with conversation_reads table
+        unread_count: userId === row.renter_id
+          ? row.renter_unread_count
+          : row.host_unread_count,
       }));
     },
     staleTime: 15_000,

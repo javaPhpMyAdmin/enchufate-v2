@@ -22,7 +22,7 @@
  * (or the explicit back button in the header) returns the user
  * to the Mensajes list.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -48,6 +48,7 @@ import { useMessages } from '@/features/messaging/hooks/useMessages';
 import { useSendMessage } from '@/features/messaging/hooks/useSendMessage';
 import { otherParty, type Message } from '@/features/messaging/types';
 import { formatRelativeTime } from '@/lib/format';
+import { supabase } from '@/lib/supabase';
 import { colors, radius, spacing, typography } from '@/theme';
 
 export default function ThreadScreen() {
@@ -70,6 +71,21 @@ export default function ThreadScreen() {
     const list = messages.data ?? [];
     return [...list].reverse();
   }, [messages.data]);
+
+  // Reset unread count when opening a conversation
+  useEffect(() => {
+    if (!conversationId || !userId || !conversations.data) return;
+    const conv = conversations.data.find((c) => c.id === conversationId);
+    if (!conv) return;
+    const isHost = conv.host_id === userId;
+    const update = isHost
+      ? { host_unread_count: 0 }
+      : { renter_unread_count: 0 };
+    void supabase
+      .from('conversations')
+      .update(update)
+      .eq('id', conversationId);
+  }, [conversationId, userId, conversations.data]);
 
   if (sessionLoading) {
     return <LoadingState />;
