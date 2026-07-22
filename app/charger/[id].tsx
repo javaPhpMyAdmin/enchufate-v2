@@ -325,10 +325,12 @@ export default function ChargerDetailScreen() {
         ) : null}
       </ScrollView>
 
-      {/* Sticky Reservar CTA */}
-      <View style={[styles.ctaBar, { paddingBottom: insets.bottom + spacing.sm }]}>
-        <Button label="Reservar" variant="primary" fullWidth size="lg" onPress={onReservarPress} />
-      </View>
+      {/* Sticky Reservar CTA — hidden for the charger owner */}
+      {session?.user?.id !== c.owner_id && (
+        <View style={[styles.ctaBar, { paddingBottom: insets.bottom + spacing.sm }]}>
+          <Button label="Reservar" variant="primary" fullWidth size="lg" onPress={onReservarPress} />
+        </View>
+      )}
 
       {/* Reservation duration picker sheet */}
       <BottomSheetModal

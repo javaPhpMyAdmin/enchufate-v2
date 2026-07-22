@@ -7,25 +7,14 @@
  * charger row. On success invalidates the relevant query keys and
  * resets the store.
  *
- * **Phase 6 PR-D (this commit — MOCK data path)**:
- *   - The hook signature is the same as the real Phase 7 swap
- *     (`publish(): Promise<{ chargerId: string }>`, plus
- *     `isPending` + `error: AppError | null`).
- *   - Photo upload is simulated with a 400ms `setTimeout` per
- *     photo (the real path is in the `// TODO Phase 7` comment
- *     below — `fetch(uri).then(r => r.blob())` →
- *     `supabase.storage.from('charger-photos').upload(path, blob)`).
- *   - The insert is simulated with a 400ms `setTimeout` that
- *     returns a freshly-generated `chargerId` (the real path is
- *     `supabase.from('chargers').insert({ host_id, ...payload, photos: publicUrls })`).
- *   - The `publicUrls` array carries the URIs as-is; the real
- *     path will replace each entry with the public URL Supabase
- *     returns.
+ * Photo upload: each compressed URI from the publish store is fetched
+ * as a blob and uploaded to the `charger-photos` bucket. The public
+ * URL is stored in the charger record's `photos` array.
  *
- * Errors are normalized to `AppError` via `normalizeSupabaseError`
- * (defensive — the mock never errors today). The `kind: 'validation'`
- * case is special-cased so a `chargerSchema.parse` failure surfaces
- * as a typed `AppError` instead of leaking a Zod error to the UI.
+ * Errors are normalized to `AppError` via `normalizeSupabaseError`.
+ * The validation case is special-cased so a `chargerSchema.parse`
+ * failure surfaces as a typed `AppError` instead of leaking a Zod
+ * error to the UI.
  *
  * Gated by `isFeatureEnabled('PUBLISH')` so the wizard can be
  * killed in one place without deleting the hook.
@@ -37,22 +26,19 @@ import { AppError, normalizeSupabaseError } from '@/lib/error';
 import { chargerSchema } from '@/lib/schemas/charger';
 import { isFeatureEnabled } from '@/lib/features';
 import { queryClient } from '@/lib/queryClient';
+import { supabase } from '@/lib/supabase';
 import { usePublishStore } from '@/stores/publishStore';
 
 import { useSession } from '@/features/auth/hooks/useSession';
+import { File as ExpoFile } from 'expo-file-system';
 
-const UPLOAD_DELAY_MS = 400;
-const INSERT_DELAY_MS = 400;
-
-/** Generates a v4-ish id without depending on `crypto.randomUUID` (older RN). */
-function generateChargerId(): string {
-  const cryptoRef = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
-  if (cryptoRef?.randomUUID) {
-    return cryptoRef.randomUUID();
-  }
-  // Fallback: timestamp + random — not RFC 4122 compliant but
-  // unique enough for a local mock.
-  return `mock-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+/** UUID v4 generator — no `crypto.randomUUID` dependency (Hermes). */
+function uuidV4(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 export interface UsePublishChargerResult {
@@ -145,34 +131,51 @@ export function usePublishCharger(): UsePublishChargerResult & {
         });
       }
 
-      // ----- 3. Photo upload (MOCK) -----
-      // For each photo URI we simulate a 400ms upload and accumulate
-      // the URI as-is in the `publicUrls` array. The real path will
-      // fetch the file as a blob and call supabase.storage.from(...).
-      const chargerId = generateChargerId();
+      // ----- 3. Photo upload -----
+      // Generate a UUID v4 for the charger id. We need it before the
+      // insert because the storage path uses it. Hermes doesn't have
+      // `crypto.randomUUID`, so we generate one manually.
+      const chargerId = uuidV4();
       const publicUrls: string[] = [];
-      for (const uri of draft.photos) {
-        // TODO Phase 7: replace mock with real upload
-        //   const blob = await fetch(uri).then((r) => r.blob());
-        //   const path = `${user.id}/${chargerId}/${index}.jpg`;
-        //   const { error: uploadErr } = await supabase.storage
-        //     .from('charger-photos')
-        //     .upload(path, blob, { contentType: 'image/jpeg', upsert: false });
-        //   if (uploadErr) throw normalizeSupabaseError(uploadErr);
-        //   publicUrls.push(supabase.storage.from('charger-photos').getPublicUrl(path).data.publicUrl);
-        await new Promise((r) => setTimeout(r, UPLOAD_DELAY_MS));
-        publicUrls.push(uri);
+      const storage = supabase.storage.from('charger-photos');
+
+      for (let i = 0; i < draft.photos.length; i++) {
+        const uri = draft.photos[i]!;
+        const path = `${user.id}/${chargerId}/${i}.jpg`;
+
+        // expo-file-system v57: File implements Blob, read as ArrayBuffer
+        // directly. The old readAsStringAsync is removed.
+        const file = new ExpoFile(uri);
+        const arrayBuffer = await file.arrayBuffer();
+
+        const { error: uploadErr } = await storage.upload(path, arrayBuffer, {
+          contentType: 'image/jpeg',
+          upsert: false,
+        });
+        if (uploadErr) throw normalizeSupabaseError(uploadErr);
+
+        const { data: urlData } = storage.getPublicUrl(path);
+        publicUrls.push(urlData.publicUrl);
       }
 
-      // ----- 4. Charger insert (MOCK) -----
-      // The mock returns the generated id after 400ms. The real
-      // path will insert and throw `normalizeSupabaseError` on failure.
-      // TODO Phase 7: replace mock with real insert
-      //   const { error: insertErr } = await supabase
-      //     .from('chargers')
-      //     .insert({ host_id: user.id, ...payload, photos: publicUrls });
-      //   if (insertErr) throw normalizeSupabaseError(insertErr);
-      await new Promise((r) => setTimeout(r, INSERT_DELAY_MS));
+      // ----- 4. Charger insert -----
+      const { error: insertErr } = await supabase.from('chargers').insert({
+        id: chargerId,
+        owner_id: user.id,
+        title: payload.title,
+        description: payload.description,
+        address: payload.address,
+        lat: payload.lat,
+        lng: payload.lng,
+        connector_type: payload.connector_type,
+        power_kw: payload.power_kw,
+        price_per_hour_usd: payload.price_per_hour_usd,
+        min_reservation_minutes: payload.min_reservation_minutes,
+        photos: publicUrls,
+        rules: payload.rules,
+        schedule: payload.schedule as unknown as Record<string, unknown>,
+      });
+      if (insertErr) throw normalizeSupabaseError(insertErr);
 
       // ----- 5. Side effects on success -----
       // Invalidate the charger list + the host's own list so the
