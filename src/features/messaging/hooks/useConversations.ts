@@ -17,7 +17,7 @@ import { AppError, normalizeSupabaseError } from '@/lib/error';
 import { isFeatureEnabled } from '@/lib/features';
 import { supabase } from '@/lib/supabase';
 
-import type { Conversation } from '../types';
+import type { Conversation, MessageKind } from '../types';
 
 const QUERY_KEY = (uid: string) => ['conversations', uid] as const;
 
@@ -54,6 +54,7 @@ export function useConversations(
         .from('conversations')
         .select(`
           id, charger_id, renter_id, host_id, last_message_at,
+          last_message_body, last_message_kind,
           renter:profiles!renter_id(id, full_name, avatar_url),
           host:profiles!host_id(id, full_name, avatar_url),
           charger:chargers(id, title)
@@ -75,11 +76,9 @@ export function useConversations(
         host_name: (row.host as any)?.full_name ?? '',
         host_avatar_url: (row.host as any)?.avatar_url ?? null,
         last_message_at: row.last_message_at,
-        // Denormalized fields not available from DB yet — will be
-        // populated by the edge function or trigger in a future phase.
-        last_message_body: '',
-        last_message_kind: 'user' as const,
-        unread_count: 0,
+        last_message_body: row.last_message_body ?? '',
+        last_message_kind: (row.last_message_kind ?? 'user') as MessageKind,
+        unread_count: 0, // TODO: implement with conversation_reads table
       }));
     },
     staleTime: 15_000,

@@ -89,6 +89,9 @@ export type Database = {
           host_id: string
           id: string
           last_message_at: string
+          last_message_body: string | null
+          last_message_kind: Database["public"]["Enums"]["message_kind"] | null
+          last_message_sender_id: string | null
           renter_id: string
         }
         Insert: {
@@ -97,6 +100,9 @@ export type Database = {
           host_id: string
           id?: string
           last_message_at?: string
+          last_message_body?: string | null
+          last_message_kind?: Database["public"]["Enums"]["message_kind"] | null
+          last_message_sender_id?: string | null
           renter_id: string
         }
         Update: {
@@ -105,6 +111,9 @@ export type Database = {
           host_id?: string
           id?: string
           last_message_at?: string
+          last_message_body?: string | null
+          last_message_kind?: Database["public"]["Enums"]["message_kind"] | null
+          last_message_sender_id?: string | null
           renter_id?: string
         }
         Relationships: [
