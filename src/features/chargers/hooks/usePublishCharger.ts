@@ -173,7 +173,7 @@ export function usePublishCharger(): UsePublishChargerResult & {
         min_reservation_minutes: payload.min_reservation_minutes,
         photos: publicUrls,
         rules: payload.rules,
-        schedule: payload.schedule as unknown as Record<string, unknown>,
+        schedule: payload.schedule as any,
       });
       if (insertErr) throw normalizeSupabaseError(insertErr);
 
