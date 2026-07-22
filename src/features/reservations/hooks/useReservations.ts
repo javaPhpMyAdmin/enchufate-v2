@@ -118,21 +118,39 @@ export function useReservations(
         );
       }
       // ----- REAL Supabase path -----
-      // The @ts-expect-error + as unknown cast pattern is
-      // consistent with the new hooks — the placeholder
-      // src/lib/database.types.ts is strict-empty by design.
-      // The .or() filter covers the renter + host paths in one
-      // round-trip; the client-side `role` filter narrows the
-      // result to the active tab.
-      const orFilter = `renter_id.eq.${userId},host_id.eq.${userId}`;
-      const result = (await (supabase
+      // The reservations table has no host_id column — the host is
+      // derived from chargers.owner_id. We split by role:
+      //   renter: renter_id.eq.{userId}
+      //   host:   charger_id.in.{user's charger IDs}
+      let query = supabase
         .from('reservations' as never)
         .select('*')
-        .or(orFilter)
-        .order('start_at', { ascending: true, nullsFirst: false }) as unknown as Promise<{
+        .order('start_at', { ascending: true, nullsFirst: false });
+
+      if (role === 'renter') {
+        query = query.eq('renter_id', userId);
+      } else {
+        const { data: chargers, error: chargersErr } = await supabase
+          .from('chargers' as never)
+          .select('id' as never)
+          .eq('owner_id', userId);
+        if (chargersErr) {
+          throw new AppError({
+            code: 'reservations_load_failed',
+            message: chargersErr.message,
+            userMessage: 'No pudimos cargar tus reservas. Intentá de nuevo.',
+            retryable: true,
+          });
+        }
+        const chargerIds = (chargers ?? []).map((c: any) => c.id);
+        if (chargerIds.length === 0) return [];
+        query = query.in('charger_id', chargerIds);
+      }
+
+      const result = await (query as unknown as Promise<{
         data: Reservation[] | null;
         error: unknown;
-      }>));
+      }>);
       if (result.error) {
         throw new AppError({
           code: 'reservations_load_failed',
@@ -141,8 +159,7 @@ export function useReservations(
           retryable: true,
         });
       }
-      const all = result.data ?? [];
-      return all.filter((r) => (role === 'renter' ? r.renter_id === userId : r.host_id === userId));
+      return result.data ?? [];
     },
     staleTime: 15_000,
   });
