@@ -52,6 +52,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ErrorBoundary } from '@/components/molecules/ErrorBoundary';
 import { useSession } from '@/features/auth/hooks/useSession';
+import { useRegisterPushToken } from '@/features/auth/hooks/useRegisterPushToken';
 import { FEATURES, isFeatureEnabled } from '@/lib/features';
 import { queryClient } from '@/lib/queryClient';
 import {
@@ -64,6 +65,7 @@ export default function RootLayout() {
   // hydrates the auth store). The returned state is consumed by
   // individual screens, not the layout.
   useSession();
+  useRegisterPushToken();
 
   // ----- Boot side effects (Phase 8 polish) -----
   useEffect(() => {
