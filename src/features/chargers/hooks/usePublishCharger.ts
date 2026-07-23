@@ -30,7 +30,6 @@ import { supabase } from '@/lib/supabase';
 import { usePublishStore } from '@/stores/publishStore';
 
 import { useSession } from '@/features/auth/hooks/useSession';
-import { File as ExpoFile } from 'expo-file-system';
 
 /** UUID v4 generator — no `crypto.randomUUID` dependency (Hermes). */
 function uuidV4(): string {
@@ -143,10 +142,11 @@ export function usePublishCharger(): UsePublishChargerResult & {
         const uri = draft.photos[i]!;
         const path = `${user.id}/${chargerId}/${i}.jpg`;
 
-        // expo-file-system v57: File implements Blob, read as ArrayBuffer
-        // directly. The old readAsStringAsync is removed.
-        const file = new ExpoFile(uri);
-        const arrayBuffer = await file.arrayBuffer();
+        // Fetch the compressed image URI as an ArrayBuffer.
+        // Works with any expo-file-system version — no native
+        // dependency needed for this conversion.
+        const response = await fetch(uri);
+        const arrayBuffer = await response.arrayBuffer();
 
         const { error: uploadErr } = await storage.upload(path, arrayBuffer, {
           contentType: 'image/jpeg',
