@@ -156,18 +156,18 @@ export default function MapTab() {
         id?: string;
       };
       if (props.cluster && typeof props.cluster_id === 'number' && sourceRef.current) {
-        try {
-          const zoom = await sourceRef.current.getClusterExpansionZoom(props.cluster_id);
+        // @rnmapbox/maps getClusterExpansionZoom crashes on Android
+        // with Gson JsonSyntaxException. Instead, we zoom in by a
+        // fixed increment using the cluster's own coordinates.
+        const coords = feature.geometry?.coordinates as [number, number] | undefined;
+        if (coords) {
+          const currentZoom = 12; // approximate cluster zoom level
           cameraRef.current?.setCamera({
-            zoomLevel: zoom,
+            centerCoordinate: coords,
+            zoomLevel: currentZoom + 2,
             animationMode: 'easeTo',
             animationDuration: 500,
           });
-        } catch {
-          // Known @rnmapbox/maps Android bug: Gson throws
-          // JsonSyntaxException when parsing the expansion zoom response.
-          // Silently ignore — user can tap individual pins instead.
-          console.warn('[Map] getClusterExpansionZoom failed on Android');
         }
         return;
       }
