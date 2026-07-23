@@ -32,7 +32,7 @@ export const FEATURES = {
   /** 7-step publish wizard for hosts (Phase 5). */
   PUBLISH: true,
   /** Push notifications via APNs / FCM. Deferred to v2.1. */
-  PUSH_NOTIFICATIONS: false,
+  PUSH_NOTIFICATIONS: true,
   /** In-app payment flow. Deferred to v2.1. */
   IN_APP_PAYMENTS: false,
   /** Edit / delete an existing charger. Deferred to v2.1. */
