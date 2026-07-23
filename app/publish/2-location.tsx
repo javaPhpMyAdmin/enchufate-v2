@@ -44,6 +44,8 @@ import { Card } from '@/components/atoms/Card';
 import { Icon } from '@/components/atoms/Icon';
 import { Input } from '@/components/atoms/Input';
 import { PermissionToast } from '@/components/molecules/PermissionToast';
+import * as Location from 'expo-location';
+
 import {
   getCurrentPosition,
   requestLocationPermission,
@@ -57,11 +59,25 @@ import { colors, radius, spacing, typography } from '@/theme';
 type PermissionState = 'loading' | 'granted' | 'denied';
 
 /**
- * Stub "reverse-geocoded" address. Per the spec, we surface the
- * raw lat/lng as the address text until Phase 8 wires real
- * reverse geocoding. The user can edit the string before
- * tapping Siguiente.
+ * Reverse geocode lat/lng into a human-readable address using
+ * expo-location. Falls back to raw coordinates when the API
+ * returns nothing or errors.
  */
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  try {
+    const [result] = await Location.reverseGeocodeAsync({
+      latitude: lat,
+      longitude: lng,
+    });
+    if (!result) return coordsAsAddress(lat, lng);
+    const parts = [result.street, result.name, result.city, result.region].filter(Boolean);
+    return parts.join(', ') || coordsAsAddress(lat, lng);
+  } catch {
+    return coordsAsAddress(lat, lng);
+  }
+}
+
+/** Fallback: raw coordinates. */
 function coordsAsAddress(lat: number, lng: number): string {
   return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 }
@@ -89,10 +105,11 @@ export default function PublishStep2Location(): React.JSX.Element {
       const pos = await getCurrentPosition();
       if (!mounted) return;
       if (pos) {
+        const address = await reverseGeocode(pos.lat, pos.lng);
         const next: PublishLocation = {
           lat: pos.lat,
           lng: pos.lng,
-          address: coordsAsAddress(pos.lat, pos.lng),
+          address,
         };
         setLocation(next);
         setPermission('granted');
