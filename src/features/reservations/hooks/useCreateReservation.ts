@@ -18,6 +18,7 @@ import { isFeatureEnabled } from '@/lib/features';
 import { queryClient } from '@/lib/queryClient';
 import { reservationInputSchema, type ReservationCreateInput } from '@/lib/schemas/reservation';
 import { supabase } from '@/lib/supabase';
+import { sendPushNotification } from '@/lib/push';
 
 import { useSession } from '@/features/auth/hooks/useSession';
 
@@ -111,11 +112,29 @@ export function useCreateReservation(): UseCreateReservationResult {
         }
         return { reservationId: data.id };
       },
-      onSuccess: () => {
+      onSuccess: (_data, vars) => {
         void Promise.all([
           queryClient.invalidateQueries({ queryKey: ['reservations'] }),
           queryClient.invalidateQueries({ queryKey: ['conversations'] }),
         ]);
+
+        // Push notification to the host (fire-and-forget).
+        if (isFeatureEnabled('PUSH_NOTIFICATIONS') && user?.id) {
+          void (async () => {
+            const { data: charger } = await supabase
+              .from('chargers')
+              .select('owner_id, title')
+              .eq('id', vars.chargerId)
+              .single();
+            if (charger?.owner_id && charger.owner_id !== user.id) {
+              await sendPushNotification(
+                [charger.owner_id],
+                'Nueva reserva',
+                `Alguien quiere reservar tu cargador "${charger.title}".`,
+              );
+            }
+          })();
+        }
       },
     });
 

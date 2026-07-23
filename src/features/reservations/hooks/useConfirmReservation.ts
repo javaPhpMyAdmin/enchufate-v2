@@ -35,6 +35,7 @@ import { AppError, normalizeSupabaseError } from '@/lib/error';
 import { isFeatureEnabled } from '@/lib/features';
 import { queryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
+import { sendPushNotification } from '@/lib/push';
 
 import { useSession } from '@/features/auth/hooks/useSession';
 
@@ -133,16 +134,27 @@ export function useConfirmReservation(): UseConfirmReservationResult {
           queryClient.invalidateQueries({ queryKey: ['reservations'] }),
           queryClient.invalidateQueries({ queryKey: ['reservation', vars.id] }),
           queryClient.invalidateQueries({ queryKey: ['conversations'] }),
-          // The system-message-injector / triggers update the
-          // message list — invalidate the messages list too so
-          // any open thread refreshes.
           queryClient.invalidateQueries({ queryKey: ['messages'] }),
         ]);
-        // Local qc ref kept for the legacy useReservations /
-        // useReservation refetch via the singleton's
-        // invalidateQueries — same call, just to make sure the
-        // hook's own subscription refetches.
         void qc.invalidateQueries({ queryKey: ['reservation', vars.id] });
+
+        // Push notification to the renter (fire-and-forget).
+        if (isFeatureEnabled('PUSH_NOTIFICATIONS') && user?.id) {
+          void (async () => {
+            const { data: reservation } = await supabase
+              .from('reservations')
+              .select('renter_id')
+              .eq('id', vars.id)
+              .single();
+            if (reservation?.renter_id && reservation.renter_id !== user.id) {
+              await sendPushNotification(
+                [reservation.renter_id],
+                'Reserva confirmada',
+                'Tu reserva fue confirmada por el host.',
+              );
+            }
+          })();
+        }
       },
     });
 
