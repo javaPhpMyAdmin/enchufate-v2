@@ -156,12 +156,19 @@ export default function MapTab() {
         id?: string;
       };
       if (props.cluster && typeof props.cluster_id === 'number' && sourceRef.current) {
-        const zoom = await sourceRef.current.getClusterExpansionZoom(props.cluster_id);
-        cameraRef.current?.setCamera({
-          zoomLevel: zoom,
-          animationMode: 'easeTo',
-          animationDuration: 500,
-        });
+        try {
+          const zoom = await sourceRef.current.getClusterExpansionZoom(props.cluster_id);
+          cameraRef.current?.setCamera({
+            zoomLevel: zoom,
+            animationMode: 'easeTo',
+            animationDuration: 500,
+          });
+        } catch {
+          // Known @rnmapbox/maps Android bug: Gson throws
+          // JsonSyntaxException when parsing the expansion zoom response.
+          // Silently ignore — user can tap individual pins instead.
+          console.warn('[Map] getClusterExpansionZoom failed on Android');
+        }
         return;
       }
       if (props.id) {
