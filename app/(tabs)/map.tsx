@@ -164,7 +164,7 @@ export default function MapTab() {
           const currentZoom = 12; // approximate cluster zoom level
           cameraRef.current?.setCamera({
             centerCoordinate: coords,
-            zoomLevel: currentZoom + 2,
+            zoomLevel: currentZoom + 1,
             animationMode: 'easeTo',
             animationDuration: 500,
           });
