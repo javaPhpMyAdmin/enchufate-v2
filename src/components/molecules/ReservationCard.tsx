@@ -16,7 +16,7 @@ export interface ReservationCardProps {
   chargerTitle: string;
   address: string;
   timeBlock: string;
-  powerKw: number;
+  powerKw?: number | null;
   otherPartyName: string;
   otherPartyAvatarUri?: string | null;
   role: ReservationRole;
@@ -105,7 +105,8 @@ export function ReservationCard({
   );
 }
 
-function formatPower(kw: number): string {
+function formatPower(kw: number | undefined | null): string {
+  if (kw == null) return '— kW';
   return `${kw.toFixed(kw % 1 === 0 ? 0 : 1)} kW`;
 }
 

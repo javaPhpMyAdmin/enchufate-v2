@@ -7,10 +7,10 @@
  *      not implemented in MVP). Built inline (not via
  *      `Stack.Screen` header) so the avatar + status render as a
  *      single row.
- *   2. **Message list** — inverted `FlatList` of `MessageBubble`s.
- *      Inverted layout + reversed data puts the most recent
- *      message at the bottom (chat convention). New messages
- *      auto-scroll to the bottom thanks to the `inverted` prop.
+ *   2. **Message list** — `FlatList` of `MessageBubble`s in
+ *      chronological order (oldest first). Messages fill from the
+ *      top; `scrollToEnd` on load and on send keeps the latest
+ *      message visible at the bottom.
  *   3. **Composer** — multi-line `TextInput` with "Escribí un
  *      mensaje" placeholder and a paper-plane send button. The
  *      button is disabled when the input is empty or a send is in
@@ -22,7 +22,7 @@
  * (or the explicit back button in the header) returns the user
  * to the Mensajes list.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -46,7 +46,7 @@ import { useSession } from '@/features/auth/hooks/useSession';
 import { useConversations } from '@/features/messaging/hooks/useConversations';
 import { useMessages } from '@/features/messaging/hooks/useMessages';
 import { useSendMessage } from '@/features/messaging/hooks/useSendMessage';
-import { otherParty, type Message } from '@/features/messaging/types';
+import { otherParty, type Conversation, type Message } from '@/features/messaging/types';
 import { formatRelativeTime } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -64,13 +64,12 @@ export default function ThreadScreen() {
   const sendMessage = useSendMessage(conversationId ?? 'noop', userId);
 
   const [text, setText] = useState('');
+  const flatListRef = useRef<FlatList>(null);
 
-  // Memoize the reversed list so the FlatList doesn't see a new
-  // array reference on every render (preserves scroll position).
-  const reversedMessages = useMemo(() => {
-    const list = messages.data ?? [];
-    return [...list].reverse();
-  }, [messages.data]);
+  // Scroll to bottom when messages load or change.
+  const scrollToBottom = useCallback(() => {
+    flatListRef.current?.scrollToEnd({ animated: false });
+  }, []);
 
   // Reset unread count when opening a conversation
   useEffect(() => {
@@ -141,6 +140,8 @@ export default function ThreadScreen() {
     if (!text.trim() || sendMessage.isPending) return;
     sendMessage.send(text);
     setText('');
+    // Scroll to bottom after the optimistic update renders.
+    requestAnimationFrame(scrollToBottom);
   };
 
   return (
@@ -169,7 +170,7 @@ export default function ThreadScreen() {
         </View>
       </View>
 
-      {/* Message list — inverted so newest is at the bottom; auto-scrolls to the new message */}
+      {/* Message list — chronological order, auto-scrolls to bottom on load and send */}
       {messages.isLoading ? (
         <LoadingState label="Cargando mensajes..." />
       ) : messages.error ? (
@@ -180,14 +181,20 @@ export default function ThreadScreen() {
         />
       ) : (
         <FlatList
-          data={reversedMessages}
-          inverted
+          ref={flatListRef}
+          data={messages.data ?? []}
           keyExtractor={(m) => m.id}
           renderItem={({ item }) => (
-            <MessageBubbleRow message={item} currentUserId={userId ?? 'mock-uid'} />
+            <MessageBubbleRow
+              message={item}
+              currentUserId={userId ?? 'mock-uid'}
+              conversation={conversation}
+            />
           )}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
+          onContentSizeChange={scrollToBottom}
+          onLayout={scrollToBottom}
         />
       )}
 
@@ -235,12 +242,27 @@ export default function ThreadScreen() {
 function MessageBubbleRow({
   message,
   currentUserId,
+  conversation,
 }: {
   message: Message;
   currentUserId: string;
+  conversation: Conversation;
 }): React.JSX.Element {
-  // For system messages, isOwn is irrelevant (MessageBubble ignores it).
-  const isOwn = message.sender_id !== null && message.sender_id === currentUserId;
+  // For system messages, determine ownership based on who triggered the action:
+  // - reservation_requested → renter initiated → own for renter
+  // - reservation_confirmed → host initiated → own for host
+  // - reservation_cancelled → either party, default left
+  let isOwn: boolean;
+  if (message.sender_id !== null) {
+    isOwn = message.sender_id === currentUserId;
+  } else if (message.kind === 'system_reservation_requested') {
+    isOwn = conversation.renter_id === currentUserId;
+  } else if (message.kind === 'system_reservation_confirmed') {
+    isOwn = conversation.host_id === currentUserId;
+  } else {
+    isOwn = false;
+  }
+
   const timestamp = message.pending ? 'Enviando...' : formatRelativeTime(message.created_at);
   return (
     <MessageBubble

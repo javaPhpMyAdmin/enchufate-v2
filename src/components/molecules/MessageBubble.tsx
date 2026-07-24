@@ -50,12 +50,13 @@ export function MessageBubble({
   style,
 }: MessageBubbleProps): React.JSX.Element {
   const isUser = kind === 'user';
-  // For user messages, alignment follows `isOwn`. For system
-  // messages, always left-aligned gray in Phase 5 (spec polish
-  // deferred to Phase 7).
+  // Alignment follows `isOwn` for all message kinds.
+  // User messages: right-aligned orange (own) vs left-aligned gray (other).
+  // System messages: right-aligned gray (own action) vs left-aligned gray (other).
   const isOutgoing = isUser && isOwn;
+  const isRightAligned = isOwn;
   const bubbleStyle = isOutgoing ? styles.bubbleUser : styles.bubbleSystem;
-  const rowStyle = isOutgoing ? styles.rowUser : styles.rowSystem;
+  const rowStyle = isRightAligned ? styles.rowUser : styles.rowSystem;
   const bodyStyle = isOutgoing ? styles.bodyUser : styles.bodySystem;
   const timestampStyle = isOutgoing ? styles.timestampUser : styles.timestampSystem;
 

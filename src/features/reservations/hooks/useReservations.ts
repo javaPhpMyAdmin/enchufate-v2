@@ -119,12 +119,22 @@ export function useReservations(
       }
       // ----- REAL Supabase path -----
       // The reservations table has no host_id column — the host is
-      // derived from chargers.owner_id. We split by role:
-      //   renter: renter_id.eq.{userId}
-      //   host:   charger_id.in.{user's charger IDs}
+      // derived from chargers.owner_id. We join chargers + profiles
+      // to get the denormalized fields the UI expects.
+      const SELECT_FIELDS = `
+        id, charger_id, renter_id, start_at, end_at,
+        horario_a_coordinar, status, created_at, updated_at,
+        charger:chargers!reservations_charger_id_fkey(
+          title, address, power_kw, connector_type, lat, lng, owner_id
+        ),
+        renter_profile:profiles!reservations_renter_id_fkey(
+          full_name, avatar_url
+        )
+      ` as never;
+
       let query = supabase
         .from('reservations' as never)
-        .select('*')
+        .select(SELECT_FIELDS)
         .order('start_at', { ascending: true, nullsFirst: false });
 
       if (role === 'renter') {
@@ -148,7 +158,7 @@ export function useReservations(
       }
 
       const result = await (query as unknown as Promise<{
-        data: Reservation[] | null;
+        data: any[] | null;
         error: unknown;
       }>);
       if (result.error) {
@@ -159,7 +169,80 @@ export function useReservations(
           retryable: true,
         });
       }
-      return result.data ?? [];
+
+      // Map the joined result to the denormalized Reservation shape.
+      const rows = result.data ?? [];
+
+      // Collect unique host IDs (charger owners) to batch-fetch profiles.
+      const hostIds = [...new Set(
+        rows
+          .map((r: any) => r.charger?.owner_id)
+          .filter((id: string | undefined): id is string => Boolean(id)),
+      )];
+
+      let hostProfiles: Record<string, { full_name: string | null; avatar_url: string | null }> = {};
+      if (hostIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', hostIds);
+        if (profiles) {
+          for (const p of profiles as any[]) {
+            hostProfiles[p.id] = { full_name: p.full_name, avatar_url: p.avatar_url };
+          }
+        }
+      }
+
+      // Batch-fetch conversations to resolve conversation_id.
+      // Conversations are keyed by (charger_id, renter_id).
+      const convPairs = rows.map((r: any) => ({
+        charger_id: r.charger_id as string,
+        renter_id: r.renter_id as string,
+      }));
+      const convIndex: Record<string, string> = {};
+      if (convPairs.length > 0) {
+        const chargerIds = [...new Set(convPairs.map((p) => p.charger_id))];
+        const renterIds = [...new Set(convPairs.map((p) => p.renter_id))];
+        const { data: convs } = await supabase
+          .from('conversations')
+          .select('id, charger_id, renter_id')
+          .in('charger_id', chargerIds)
+          .in('renter_id', renterIds);
+        if (convs) {
+          for (const c of convs as any[]) {
+            convIndex[`${c.charger_id}:${c.renter_id}`] = c.id;
+          }
+        }
+      }
+
+      return rows.map((r: any): Reservation => {
+        const charger = r.charger ?? { title: '', address: '', power_kw: 0, connector_type: '', lat: 0, lng: 0, owner_id: '' };
+        const renterProfile = r.renter_profile ?? { full_name: null, avatar_url: null };
+        const hostProfile = hostProfiles[charger.owner_id] ?? { full_name: null, avatar_url: null };
+        return {
+          id: r.id,
+          charger_id: r.charger_id,
+          charger_title: charger.title ?? '',
+          charger_address: charger.address ?? '',
+          charger_lat: charger.lat ?? 0,
+          charger_lng: charger.lng ?? 0,
+          charger_power_kw: charger.power_kw ?? 0,
+          charger_connector_type: charger.connector_type ?? '',
+          renter_id: r.renter_id,
+          renter_name: renterProfile.full_name ?? 'Huésped',
+          renter_avatar_url: renterProfile.avatar_url,
+          host_id: charger.owner_id ?? '',
+          host_name: hostProfile.full_name ?? 'Anfitrión',
+          host_avatar_url: hostProfile.avatar_url,
+          start_at: r.start_at,
+          end_at: r.end_at,
+          horario_a_coordinar: r.horario_a_coordinar,
+          status: r.status,
+          created_at: r.created_at,
+          updated_at: r.updated_at,
+          conversation_id: convIndex[`${r.charger_id}:${r.renter_id}`] ?? '',
+        };
+      });
     },
     staleTime: 15_000,
   });

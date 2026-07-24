@@ -57,6 +57,7 @@ import { ErrorState } from '@/components/molecules/ErrorState';
 import { LoadingState } from '@/components/molecules/LoadingState';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { useCancelReservation } from '@/features/reservations/hooks/useCancelReservation';
+import { useConfirmReservation } from '@/features/reservations/hooks/useConfirmReservation';
 import { useReservation } from '@/features/reservations/hooks/useReservation';
 import {
   isCancellable,
@@ -76,6 +77,7 @@ export default function ReservationDetailScreen() {
   const userId = session?.user.id ?? null;
   const reservation = useReservation(reservationId);
   const { cancel, isPending: isCancelling, error: cancelError } = useCancelReservation();
+  const { confirm, isPending: isConfirming, error: confirmError } = useConfirmReservation();
 
   // The confirm modal visibility state. We hold the modal open
   // while the mutation is in flight so the user can't double-tap;
@@ -86,6 +88,9 @@ export default function ReservationDetailScreen() {
   // normalizes to AppError, so the `userMessage` is voseo + safe.
   if (cancelError && !cancelModalVisible) {
     Alert.alert('No pudimos cancelar la reserva', cancelError.userMessage);
+  }
+  if (confirmError) {
+    Alert.alert('No pudimos confirmar la reserva', confirmError.userMessage);
   }
 
   const onCancelPress = useCallback(() => {
@@ -111,6 +116,17 @@ export default function ReservationDetailScreen() {
     if (isCancelling) return; // ignore close while in flight
     setCancelModalVisible(false);
   }, [isCancelling]);
+
+  const onConfirmPress = useCallback(async () => {
+    if (!reservation.data) return;
+    try {
+      await confirm(reservation.data.id, reservation.data.status as ReservationStatus);
+      Alert.alert('Reserva confirmada', 'El huésped será notificado.');
+      router.back();
+    } catch {
+      // Error surfaced via confirmError Alert above.
+    }
+  }, [confirm, reservation.data, router]);
 
   const onOpenInMaps = useCallback(() => {
     if (!reservation.data) return;
@@ -275,6 +291,16 @@ export default function ReservationDetailScreen() {
             leftIcon={<Icon icon={MessageCircle} size="md" color={colors.textOnPrimary} />}
             onPress={onChat}
           />
+          {/* Confirm: visible only for the host when status is 'solicitada' */}
+          {userId === r.host_id && r.status === 'solicitada' ? (
+            <Button
+              label={isConfirming ? 'Confirmando...' : 'Confirmar reserva'}
+              variant="primary"
+              fullWidth
+              onPress={onConfirmPress}
+              disabled={isConfirming}
+            />
+          ) : null}
           {isCancellable(r.status as ReservationStatus) ? (
             <Button
               label="Cancelar reserva"
