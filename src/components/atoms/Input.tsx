@@ -38,6 +38,7 @@ export interface InputProps {
   textContentType?: TextInputProps['textContentType'];
   returnKeyType?: TextInputProps['returnKeyType'];
   onSubmitEditing?: TextInputProps['onSubmitEditing'];
+  maxLength?: number;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -61,6 +62,7 @@ export function Input({
   textContentType,
   returnKeyType,
   onSubmitEditing,
+  maxLength,
   style,
 }: InputProps): React.JSX.Element {
   const [hidden, setHidden] = useState(secureTextEntry);
@@ -99,6 +101,7 @@ export function Input({
           textContentType={textContentType}
           returnKeyType={returnKeyType}
           onSubmitEditing={onSubmitEditing}
+          maxLength={maxLength}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={[styles.input, typography.body, { color: colors.textPrimary }]}

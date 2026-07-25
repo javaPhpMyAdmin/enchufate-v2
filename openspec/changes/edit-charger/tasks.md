@@ -31,10 +31,10 @@ Chain strategy: pending
 
 ## Phase 2: Edit Screen
 
-- [ ] 2.1 Create `app/edit-charger/[id].tsx` — route file with header ("Editar cargador" + back button), `useCharger(id)` fetch, owner guard (`session.user.id !== c.owner_id` → `ErrorState`), loading/error skeletons, local `useState` per editable field initialized from fetched data
-- [ ] 2.2 Add field groups to edit screen — Info (title 80-char, description 500-char counter), Location (address + read-only lat/lng), Connector (Chip group 5 options + power kW decimal-pad input), Pricing (price/hour USD + min reservation Chip group), Schedule (7-day rows reusing `publish/6-schedule.tsx` layout), Rules (300-char counter, optional)
-- [ ] 2.3 Add photo management to edit screen — 2-column grid with existing thumbnails + X delete button, "+ Agregar" tile via `expo-image-picker`, "N de 5" counter, `PhotoState` tracking retained/added/removed, hide add when count = 5
-- [ ] 2.4 Add sticky "Guardar" CTA — disabled while `isPending`, on tap: run `chargerSchema.omit({id, owner_id, status, created_at, updated_at}).parse(payload)`, call `useUpdateCharger` with field payload + photo ops, `router.back()` on success, show `error.userMessage` on failure
+- [x] 2.1 Create `app/edit-charger/[id].tsx` — route file with header ("Editar cargador" + back button), `useCharger(id)` fetch, owner guard (`session.user.id !== c.owner_id` → `ErrorState`), loading/error skeletons, local `useState` per editable field initialized from fetched data
+- [x] 2.2 Add field groups to edit screen — Info (title 80-char, description 500-char counter), Location (address + read-only lat/lng), Connector (Chip group 5 options + power kW decimal-pad input), Pricing (price/hour USD + min reservation Chip group), Schedule (7-day rows reusing `publish/6-schedule.tsx` layout), Rules (300-char counter, optional)
+- [x] 2.3 Add photo management to edit screen — 2-column grid with existing thumbnails + X delete button, "+ Agregar" tile via `expo-image-picker`, "N de 5" counter, `PhotoState` tracking retained/added/removed, hide add when count = 5
+- [x] 2.4 Add sticky "Guardar" CTA — disabled while `isPending`, on tap: run `chargerSchema.omit({id, owner_id, status, created_at, updated_at}).parse(payload)`, call `useUpdateCharger` with field payload + photo ops, `router.back()` on success, show `error.userMessage` on failure
 
 ## Phase 3: Entry Points
 
