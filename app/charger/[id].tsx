@@ -63,6 +63,7 @@ import { useSession } from '@/features/auth/hooks/useSession';
 import { useCharger } from '@/features/chargers/hooks/useCharger';
 import { CONNECTOR_LABEL } from '@/features/chargers/types';
 import { useCreateReservation } from '@/features/reservations/hooks/useCreateReservation';
+import { isFeatureEnabled } from '@/lib/features';
 import { formatPrice } from '@/lib/format';
 import { colors, radius, spacing, typography } from '@/theme';
 
@@ -325,12 +326,22 @@ export default function ChargerDetailScreen() {
         ) : null}
       </ScrollView>
 
-      {/* Sticky Reservar CTA — hidden for the charger owner */}
-      {session?.user?.id !== c.owner_id && (
+      {/* Sticky CTA — "Reservar" for guests, "Editar" for the owner */}
+      {session?.user?.id !== c.owner_id ? (
         <View style={[styles.ctaBar, { paddingBottom: insets.bottom + spacing.sm }]}>
           <Button label="Reservar" variant="primary" fullWidth size="lg" onPress={onReservarPress} />
         </View>
-      )}
+      ) : isFeatureEnabled('EDIT_CHARGER') ? (
+        <View style={[styles.ctaBar, { paddingBottom: insets.bottom + spacing.sm }]}>
+          <Button
+            label="Editar"
+            variant="primary"
+            fullWidth
+            size="lg"
+            onPress={() => router.push(`/edit-charger/${chargerId}` as never)}
+          />
+        </View>
+      ) : null}
 
       {/* Reservation duration picker sheet */}
       <BottomSheetModal

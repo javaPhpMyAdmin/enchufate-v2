@@ -48,6 +48,7 @@ import { useSession } from '@/features/auth/hooks/useSession';
 import { useSignOut } from '@/features/auth/hooks/useSignOut';
 import { useMyChargers } from '@/features/profile/hooks/useMyChargers';
 import { useProfile } from '@/features/profile/hooks/useProfile';
+import { isFeatureEnabled } from '@/lib/features';
 import { colors, radius, spacing, typography } from '@/theme';
 
 export default function ProfileTab() {
@@ -140,6 +141,7 @@ function AuthedState({
   insetsBottom,
   onPublishPress,
 }: AuthedStateProps): React.JSX.Element {
+  const router = useRouter();
   const profile = useProfile(userId);
   const myChargers = useMyChargers(userId);
   const signOut = useSignOut();
@@ -244,9 +246,11 @@ function AuthedState({
                   label="⋯"
                   variant="ghost"
                   size="sm"
-                  disabled
-                  accessibilityLabel="Editar cargador (próximamente)"
-                  onPress={() => undefined}
+                  disabled={!isFeatureEnabled('EDIT_CHARGER')}
+                  accessibilityLabel="Editar cargador"
+                  onPress={isFeatureEnabled('EDIT_CHARGER')
+                    ? () => router.push(`/edit-charger/${c.id}` as never)
+                    : () => undefined}
                   style={styles.chargerMenuButton}
                 />
               </View>
