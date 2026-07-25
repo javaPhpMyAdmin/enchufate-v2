@@ -36,7 +36,7 @@ export const FEATURES = {
   /** In-app payment flow. Deferred to v2.1. */
   IN_APP_PAYMENTS: false,
   /** Edit / delete an existing charger. Deferred to v2.1. */
-  EDIT_CHARGER: false,
+  EDIT_CHARGER: true,
   /** Reviews and ratings on chargers. Deferred to v2.1. */
   CHARGER_REVIEWS: false,
 } as const;
