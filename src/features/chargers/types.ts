@@ -49,6 +49,8 @@ export interface Charger {
   rules: string | null;
   schedule: ChargerSchedule;
   status: ChargerStatus;
+  avg_rating: number;
+  review_count: number;
   created_at: string;
   updated_at: string;
 }

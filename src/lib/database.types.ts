@@ -28,6 +28,8 @@ export type Database = {
           photos: string[]
           power_kw: number
           price_per_hour_usd: number
+          avg_rating: number
+          review_count: number
           rules: string | null
           schedule: Json
           status: Database["public"]["Enums"]["charger_status"]
@@ -37,6 +39,7 @@ export type Database = {
         Insert: {
           address: string
           connector_type: Database["public"]["Enums"]["connector_type"]
+          avg_rating?: number
           created_at?: string
           description: string
           id?: string
@@ -47,6 +50,7 @@ export type Database = {
           photos?: string[]
           power_kw: number
           price_per_hour_usd: number
+          review_count?: number
           rules?: string | null
           schedule?: Json
           status?: Database["public"]["Enums"]["charger_status"]
@@ -56,6 +60,7 @@ export type Database = {
         Update: {
           address?: string
           connector_type?: Database["public"]["Enums"]["connector_type"]
+          avg_rating?: number
           created_at?: string
           description?: string
           id?: string
@@ -66,6 +71,7 @@ export type Database = {
           photos?: string[]
           power_kw?: number
           price_per_hour_usd?: number
+          review_count?: number
           rules?: string | null
           schedule?: Json
           status?: Database["public"]["Enums"]["charger_status"]
@@ -302,6 +308,58 @@ export type Database = {
           {
             foreignKeyName: "push_tokens_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reviews: {
+        Row: {
+          charger_id: string
+          created_at: string
+          id: string
+          rating: number
+          reservation_id: string
+          reviewer_id: string
+          text: string | null
+        }
+        Insert: {
+          charger_id: string
+          created_at?: string
+          id?: string
+          rating: number
+          reservation_id: string
+          reviewer_id: string
+          text?: string | null
+        }
+        Update: {
+          charger_id?: string
+          created_at?: string
+          id?: string
+          rating?: number
+          reservation_id?: string
+          reviewer_id?: string
+          text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_charger_id_fkey"
+            columns: ["charger_id"]
+            isOneToOne: false
+            referencedRelation: "chargers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
