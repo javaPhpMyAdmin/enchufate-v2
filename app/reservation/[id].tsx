@@ -59,12 +59,14 @@ import { useSession } from '@/features/auth/hooks/useSession';
 import { useCancelReservation } from '@/features/reservations/hooks/useCancelReservation';
 import { useConfirmReservation } from '@/features/reservations/hooks/useConfirmReservation';
 import { useReservation } from '@/features/reservations/hooks/useReservation';
+import { useReviewEligibility } from '@/features/reviews/hooks/useReviewEligibility';
 import {
   isCancellable,
   otherParty,
   timeBlock,
   type ReservationStatus,
 } from '@/features/reservations/types';
+import { isFeatureEnabled } from '@/lib/features';
 import { colors, radius, spacing, typography } from '@/theme';
 
 export default function ReservationDetailScreen() {
@@ -78,6 +80,7 @@ export default function ReservationDetailScreen() {
   const reservation = useReservation(reservationId);
   const { cancel, isPending: isCancelling, error: cancelError } = useCancelReservation();
   const { confirm, isPending: isConfirming, error: confirmError } = useConfirmReservation();
+  const reviewEligibility = useReviewEligibility(reservationId);
 
   // The confirm modal visibility state. We hold the modal open
   // while the mutation is in flight so the user can't double-tap;
@@ -308,6 +311,18 @@ export default function ReservationDetailScreen() {
               fullWidth
               onPress={onCancelPress}
               style={styles.cancelButton}
+            />
+          ) : null}
+          {/* Review CTA: renter on a completada reservation with no existing review */}
+          {isFeatureEnabled('CHARGER_REVIEWS') &&
+          r.status === 'completada' &&
+          isMine &&
+          reviewEligibility.data?.canReview ? (
+            <Button
+              label="Dejar reseña"
+              variant="secondary"
+              fullWidth
+              onPress={() => router.push(`/review/${r.id}` as never)}
             />
           ) : null}
         </View>

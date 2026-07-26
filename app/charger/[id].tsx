@@ -63,6 +63,8 @@ import { useSession } from '@/features/auth/hooks/useSession';
 import { useCharger } from '@/features/chargers/hooks/useCharger';
 import { CONNECTOR_LABEL } from '@/features/chargers/types';
 import { useCreateReservation } from '@/features/reservations/hooks/useCreateReservation';
+import { useChargerRating } from '@/features/reviews/hooks/useChargerRating';
+import { ReviewsSection } from '@/features/reviews/components/ReviewsSection';
 import { isFeatureEnabled } from '@/lib/features';
 import { formatPrice } from '@/lib/format';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -85,6 +87,7 @@ export default function ChargerDetailScreen() {
 
   const { session } = useSession();
   const charger = useCharger(chargerId);
+  const chargerRating = useChargerRating(chargerId);
   const sheetRef = useRef<BottomSheetModal>(null);
   const directionsSheetRef = useRef<BottomSheetModal>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
@@ -305,11 +308,23 @@ export default function ChargerDetailScreen() {
               </View>
               <View style={styles.metaRow}>
                 <Icon icon={Star} size="sm" color={colors.textSecondary} />
-                <Text style={styles.metaText}>0.0 · sin reseñas todavía</Text>
+                <Text style={styles.metaText}>
+                  {(() => {
+                    const avg = chargerRating.data?.avg_rating ?? 0;
+                    const count = chargerRating.data?.review_count ?? 0;
+                    const displayAvg = avg > 0 ? avg.toFixed(1) : '0.0';
+                    return count > 0
+                      ? `${displayAvg} · ${count} reseña${count === 1 ? '' : 's'}`
+                      : '0.0 · sin reseñas todavía';
+                  })()}
+                </Text>
               </View>
             </View>
           </View>
         </Card>
+
+        {/* Reviews section (feature-gated) */}
+        <ReviewsSection chargerId={chargerId} />
 
         {/* Description */}
         <Card variant="default" padding="md" style={styles.card}>

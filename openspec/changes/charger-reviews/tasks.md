@@ -43,16 +43,16 @@ Chain strategy: stacked-to-main
 
 ## Phase 3: Charger Detail & Profile UI
 
-- [ ] 3.1 Create `src/features/reviews/components/StarPicker.tsx` — 1–5 tappable stars, default 5, selectable prop
-- [ ] 3.2 Create `src/features/reviews/components/ReviewCard.tsx` — avatar (or initials fallback), display name, star rating, text (if present), relative date via `formatRelativeTime`
-- [ ] 3.3 Create `src/features/reviews/components/ReviewsSection.tsx` — rating header `{avg} · {count} reseña(s)` or "0.0 · sin reseñas", ReviewCard list, "Ver más" pagination, empty state "Sin reseñas todavía", error state, feature-gated via `isFeatureEnabled('CHARGER_REVIEWS')`
-- [ ] 3.4 Modify `app/charger/[id].tsx` — replace hardcoded "0.0 · sin reseñas" with live avg_rating + review_count from `useChargerRating`; render `ReviewsSection` below host card, gated by flag
-- [ ] 3.5 Modify `app/(tabs)/profile.tsx` — replace hardcoded "0.0" rating and "0" reseñas stat cards with live data from `useProfileStats`, gated by flag
+- [x] 3.1 Create `src/features/reviews/components/StarPicker.tsx` — 1–5 tappable stars, default 5, selectable prop
+- [x] 3.2 Create `src/features/reviews/components/ReviewCard.tsx` — avatar (or initials fallback), display name, star rating, text (if present), relative date via `formatRelativeTime`
+- [x] 3.3 Create `src/features/reviews/components/ReviewsSection.tsx` — rating header `{avg} · {count} reseña(s)` or "0.0 · sin reseñas", ReviewCard list, "Ver más" pagination, empty state "Sin reseñas todavía", error state, feature-gated via `isFeatureEnabled('CHARGER_REVIEWS')`
+- [x] 3.4 Modify `app/charger/[id].tsx` — replace hardcoded "0.0 · sin reseñas" with live avg_rating + review_count from `useChargerRating`; render `ReviewsSection` below host card, gated by flag
+- [x] 3.5 Modify `app/(tabs)/profile.tsx` — replace hardcoded "0.0" rating and "0" reseñas stat cards with live data from `useProfileStats`, gated by flag
 
 ## Phase 4: Review Creation Flow
 
-- [ ] 4.1 Create `app/review/[reservationId].tsx` — review form route: StarPicker + TextInput (max 1000, placeholder "Contanos tu experiencia…") + "Enviar reseña" button, calls useCreateReview, validates eligibility via useReviewEligibility, shows error/inline states
-- [ ] 4.2 Modify `app/reservation/[id].tsx` — add "Dejar reseña" button on `completada` renter cards (feature-gated), navigates to `/review/${reservationId}`; hide button if review already exists via useReviewEligibility
+- [x] 4.1 Create `app/review/[reservationId].tsx` — review form route: StarPicker + TextInput (max 1000, placeholder "Contanos tu experiencia…") + "Enviar reseña" button, calls useCreateReview, validates eligibility via useReviewEligibility, shows error/inline states
+- [x] 4.2 Modify `app/reservation/[id].tsx` — add "Dejar reseña" button on `completada` renter cards (feature-gated), navigates to `/review/${reservationId}`; hide button if review already exists via useReviewEligibility
 
 ## Phase 5: Push Notification & Feature Flag
 

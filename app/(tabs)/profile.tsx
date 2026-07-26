@@ -48,6 +48,7 @@ import { useSession } from '@/features/auth/hooks/useSession';
 import { useSignOut } from '@/features/auth/hooks/useSignOut';
 import { useMyChargers } from '@/features/profile/hooks/useMyChargers';
 import { useProfile } from '@/features/profile/hooks/useProfile';
+import { useProfileStats } from '@/features/profile/hooks/useProfileStats';
 import { isFeatureEnabled } from '@/lib/features';
 import { colors, radius, spacing, typography } from '@/theme';
 
@@ -144,6 +145,7 @@ function AuthedState({
   const router = useRouter();
   const profile = useProfile(userId);
   const myChargers = useMyChargers(userId);
+  const profileStats = useProfileStats();
   const signOut = useSignOut();
 
   const memberSince = useMemo(() => {
@@ -217,8 +219,16 @@ function AuthedState({
 
       {/* Stat cards */}
       <View style={styles.statRow}>
-        <StatCard icon={Star} value="0.0" label="Rating" />
-        <StatCard icon={CalendarCheck} value="0" label="Reseñas" />
+        <StatCard
+          icon={Star}
+          value={isFeatureEnabled('CHARGER_REVIEWS') ? (profileStats.data?.avgRating ?? 0).toFixed(1) : '0.0'}
+          label="Rating"
+        />
+        <StatCard
+          icon={CalendarCheck}
+          value={isFeatureEnabled('CHARGER_REVIEWS') ? String(profileStats.data?.reviewCount ?? 0) : '0'}
+          label="Reseñas"
+        />
         <StatCard icon={Zap} value={String(chargerCount)} label="Cargadores" />
       </View>
 
