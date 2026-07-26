@@ -59,6 +59,7 @@ import { useSession } from '@/features/auth/hooks/useSession';
 import { useCancelReservation } from '@/features/reservations/hooks/useCancelReservation';
 import { useConfirmReservation } from '@/features/reservations/hooks/useConfirmReservation';
 import { useReservation } from '@/features/reservations/hooks/useReservation';
+import { useNotifyCompletion } from '@/features/reservations/hooks/useNotifyCompletion';
 import { useReviewEligibility } from '@/features/reviews/hooks/useReviewEligibility';
 import {
   isCancellable,
@@ -81,6 +82,10 @@ export default function ReservationDetailScreen() {
   const { cancel, isPending: isCancelling, error: cancelError } = useCancelReservation();
   const { confirm, isPending: isConfirming, error: confirmError } = useConfirmReservation();
   const reviewEligibility = useReviewEligibility(reservationId);
+
+  // Send a review-prompt push when the reservation transitions to
+  // `completada` (set by DB trigger, not a client mutation).
+  useNotifyCompletion(reservation.data);
 
   // The confirm modal visibility state. We hold the modal open
   // while the mutation is in flight so the user can't double-tap;

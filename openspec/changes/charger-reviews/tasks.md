@@ -56,5 +56,5 @@ Chain strategy: stacked-to-main
 
 ## Phase 5: Push Notification & Feature Flag
 
-- [ ] 5.1 Modify `src/features/reservations/hooks/useConfirmReservation.ts` — on completada transition success, if `CHARGER_REVIEWS` enabled: query renter_id + charger.title, call `sendPushNotification([renterId], 'Reserva completada', '¿Cómo fue tu carga en {title}? Dejanos tu review')`, deep-link to `/reservation/{id}`
-- [ ] 5.2 Modify `src/lib/features.ts` — flip `CHARGER_REVIEWS` from `false` to `true`
+- [x] 5.1 Create `src/features/reservations/hooks/useNotifyCompletion.ts` — watches reservation for `completada` transition via ref-tracked status, fires `sendPushNotification([renterId], 'Reserva completada', '¿Cómo fue tu carga en {title}? Dejanos tu reseña')` once per mount; feature-gated by `CHARGER_REVIEWS`. Wired into `app/reservation/[id].tsx`.
+- [x] 5.2 Modify `src/lib/features.ts` — flip `CHARGER_REVIEWS` from `false` to `true`

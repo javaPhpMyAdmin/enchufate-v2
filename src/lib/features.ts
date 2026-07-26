@@ -37,8 +37,8 @@ export const FEATURES = {
   IN_APP_PAYMENTS: false,
   /** Edit / delete an existing charger. Deferred to v2.1. */
   EDIT_CHARGER: true,
-  /** Reviews and ratings on chargers. Deferred to v2.1. */
-  CHARGER_REVIEWS: false,
+  /** Reviews and ratings on chargers. */
+  CHARGER_REVIEWS: true,
 } as const;
 
 export type FeatureFlag = keyof typeof FEATURES;
