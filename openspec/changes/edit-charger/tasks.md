@@ -38,8 +38,8 @@ Chain strategy: pending
 
 ## Phase 3: Entry Points
 
-- [ ] 3.1 Modify `app/charger/[id].tsx` — add owner-gated "Editar" `Button` in CTA bar (line ~329), replacing the hidden Reservar for owners; gate: `isFeatureEnabled('EDIT_CHARGER') && session?.user?.id === c.owner_id`; on press: `router.push('/edit-charger/' + chargerId)`
-- [ ] 3.2 Modify `app/(tabs)/profile.tsx` — remove `disabled` from the `⋯` button (line ~247), gate `onPress` behind `isFeatureEnabled('EDIT_CHARGER')`, navigate to `/edit-charger/{c.id}`; update `accessibilityLabel` to "Editar cargador"
+- [x] 3.1 Modify `app/charger/[id].tsx` — add owner-gated "Editar" `Button` in CTA bar (line ~329), replacing the hidden Reservar for owners; gate: `isFeatureEnabled('EDIT_CHARGER') && session?.user?.id === c.owner_id`; on press: `router.push('/edit-charger/' + chargerId)`
+- [x] 3.2 Modify `app/(tabs)/profile.tsx` — remove `disabled` from the `⋯` button (line ~247), gate `onPress` behind `isFeatureEnabled('EDIT_CHARGER')`, navigate to `/edit-charger/{c.id}`; update `accessibilityLabel` to "Editar cargador"
 
 ## Phase 4: Verification
 
