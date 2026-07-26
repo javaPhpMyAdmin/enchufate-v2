@@ -42,6 +42,8 @@ export interface ConfirmModalProps {
   loading?: boolean;
   /** Disable the confirm action (e.g. when the form is invalid). */
   confirmDisabled?: boolean;
+  /** Optional content rendered between body and actions (e.g. reason picker). */
+  children?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -56,6 +58,7 @@ export function ConfirmModal({
   variant = 'default',
   loading = false,
   confirmDisabled = false,
+  children,
   style,
 }: ConfirmModalProps): React.JSX.Element {
   return (
@@ -87,6 +90,7 @@ export function ConfirmModal({
             {title}
           </Text>
           {body ? <Text style={styles.body}>{body}</Text> : null}
+          {children}
           <View style={styles.actions}>
             <Button
               label={cancelLabel}

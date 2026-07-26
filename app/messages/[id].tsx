@@ -44,6 +44,7 @@ import { LoadingState } from '@/components/molecules/LoadingState';
 import { MessageBubble } from '@/components/molecules/MessageBubble';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { useConversations } from '@/features/messaging/hooks/useConversations';
+import { useMarkAsRead } from '@/features/messages/hooks/useMarkAsRead';
 import { useMessages } from '@/features/messaging/hooks/useMessages';
 import { useSendMessage } from '@/features/messaging/hooks/useSendMessage';
 import { otherParty, type Conversation, type Message } from '@/features/messaging/types';
@@ -62,6 +63,7 @@ export default function ThreadScreen() {
   const conversations = useConversations(userId);
   const messages = useMessages(conversationId);
   const sendMessage = useSendMessage(conversationId ?? 'noop', userId);
+  const { markAsRead } = useMarkAsRead(conversationId);
 
   const [text, setText] = useState('');
   const flatListRef = useRef<FlatList>(null);
@@ -85,6 +87,13 @@ export default function ThreadScreen() {
       .update(update)
       .eq('id', conversationId);
   }, [conversationId, userId, conversations.data]);
+
+  // Mark messages as read when conversation opens (fire-and-forget)
+  useEffect(() => {
+    if (conversationId && userId) {
+      void markAsRead();
+    }
+  }, [conversationId, userId, markAsRead]);
 
   if (sessionLoading) {
     return <LoadingState />;
@@ -271,6 +280,7 @@ function MessageBubbleRow({
       isOwn={isOwn}
       timestamp={timestamp}
       pending={message.pending === true}
+      readAt={message.read_at}
     />
   );
 }

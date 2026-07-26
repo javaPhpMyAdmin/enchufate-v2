@@ -4,12 +4,18 @@
 // Sends Expo push notifications to one or more users.
 //
 // **Endpoint**:
-//   POST { userIds: string[], title: string, body: string }
+//   POST { userIds: string[], title: string, body: string,
+//          notificationType?: string }
 //   - userIds: array of auth.users UUIDs to notify
 //   - title: notification title (≤100 chars)
 //   - body: notification body (≤4000 chars)
+//   - notificationType: optional key into notification_preferences
+//     ('reservations' | 'messages' | 'reviews' | 'promotions').
+//     When provided, the function checks the recipient's preferences
+//     and skips users who have opted out of that type.
 //
-// **Auth**: calls Supabase with service-role to query push_tokens.
+// **Auth**: calls Supabase with service-role to query push_tokens
+// and notification_preferences.
 // Client calls this via the anon key + RLS (user can only insert
 // their own tokens, but the Edge Function needs to READ other
 // users' tokens — so it uses service_role).
@@ -41,6 +47,8 @@ interface PushRequest {
   userIds: string[];
   title: string;
   body: string;
+  /** Optional notification type for preference filtering. */
+  notificationType?: 'reservations' | 'messages' | 'reviews' | 'promotions';
 }
 
 function jsonResponse(status: number, body: Record<string, unknown>): Response {
@@ -77,7 +85,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse(400, {
         ok: false,
         error: 'invalid_payload',
-        hint: 'Expected { userIds: string[], title: string, body: string }',
+        hint: 'Expected { userIds: string[], title: string, body: string, notificationType?: string }',
       });
     }
     const title = raw.title.trim();
@@ -88,16 +96,41 @@ Deno.serve(async (req: Request) => {
     if (body.length === 0 || body.length > 4000) {
       return jsonResponse(400, { ok: false, error: 'body must be 1-4000 chars' });
     }
-    payload = { userIds: raw.userIds, title, body };
+    const validTypes = ['reservations', 'messages', 'reviews', 'promotions'];
+    const notificationType =
+      typeof raw.notificationType === 'string' && validTypes.includes(raw.notificationType)
+        ? raw.notificationType
+        : undefined;
+    payload = { userIds: raw.userIds, title, body, notificationType };
   } catch {
     return jsonResponse(400, { ok: false, error: 'malformed_json' });
+  }
+
+  // Filter by notification preferences when a type is specified.
+  let targetUserIds = payload.userIds;
+  if (payload.notificationType) {
+    const { data: prefs } = await supabaseAdmin
+      .from('notification_preferences')
+      .select(`user_id, ${payload.notificationType}`)
+      .in('user_id', payload.userIds);
+
+    if (prefs && prefs.length > 0) {
+      // Keep only users whose preference is true (or who have no
+      // row — default is all true).
+      const optedOut = new Set(
+        prefs
+          .filter((p: Record<string, unknown>) => p[payload.notificationType!] === false)
+          .map((p: Record<string, unknown>) => p.user_id as string),
+      );
+      targetUserIds = targetUserIds.filter((id) => !optedOut.has(id));
+    }
   }
 
   // Fetch all push tokens for the target users.
   const { data: tokens, error: tokenErr } = await supabaseAdmin
     .from('push_tokens')
     .select('token')
-    .in('user_id', payload.userIds);
+    .in('user_id', targetUserIds);
 
   if (tokenErr) {
     console.error('[send-push] token query failed', tokenErr);

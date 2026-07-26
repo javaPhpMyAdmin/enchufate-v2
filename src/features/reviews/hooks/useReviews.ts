@@ -66,6 +66,8 @@ export function useReviews(
         rating: row.rating,
         text: row.text,
         created_at: row.created_at,
+        response: row.response ?? null,
+        responded_at: row.responded_at ?? null,
         reviewer: {
           displayName: row.reviewer?.full_name ?? 'Anónimo',
           avatarUrl: row.reviewer?.avatar_url ?? null,

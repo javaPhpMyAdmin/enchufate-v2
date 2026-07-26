@@ -34,6 +34,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -91,6 +92,7 @@ export default function ReservationDetailScreen() {
   // while the mutation is in flight so the user can't double-tap;
   // the Button's `loading` prop shows the spinner.
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   // Surface mutation errors via an Alert. The hook already
   // normalizes to AppError, so the `userMessage` is voseo + safe.
@@ -108,8 +110,13 @@ export default function ReservationDetailScreen() {
   const onCancelConfirm = useCallback(async () => {
     if (!reservation.data) return;
     try {
-      await cancel(reservation.data.id, reservation.data.status as ReservationStatus);
+      await cancel(
+        reservation.data.id,
+        reservation.data.status as ReservationStatus,
+        cancelReason || undefined,
+      );
       setCancelModalVisible(false);
+      setCancelReason('');
       // Pop back to the reservations list. The TanStack Query
       // invalidations in the hook refresh the list on focus.
       router.back();
@@ -118,11 +125,12 @@ export default function ReservationDetailScreen() {
       // Alert.alert above surfaces it on the next render. We
       // keep the modal open so the user can retry or close.
     }
-  }, [cancel, reservation.data, router]);
+  }, [cancel, reservation.data, cancelReason, router]);
 
   const onCancelClose = useCallback(() => {
     if (isCancelling) return; // ignore close while in flight
     setCancelModalVisible(false);
+    setCancelReason('');
   }, [isCancelling]);
 
   const onConfirmPress = useCallback(async () => {
@@ -338,12 +346,23 @@ export default function ReservationDetailScreen() {
         onClose={onCancelClose}
         onConfirm={onCancelConfirm}
         title={`¿Cancelar la reserva de ${r.charger_title}?`}
-        body="Esta acción no se puede deshacer."
+        body="Podés indicar un motivo (opcional). Esta acción no se puede deshacer."
         confirmLabel="Cancelar y volver"
         cancelLabel="Volver"
         variant="danger"
         loading={isCancelling}
-      />
+      >
+        <TextInput
+          value={cancelReason}
+          onChangeText={setCancelReason}
+          placeholder="Motivo de cancelación (opcional)"
+          placeholderTextColor={colors.textSecondary}
+          style={styles.reasonInput}
+          multiline
+          maxLength={500}
+          editable={!isCancelling}
+        />
+      </ConfirmModal>
     </View>
   );
 }
@@ -402,4 +421,16 @@ const styles = StyleSheet.create({
 
   actions: { gap: spacing.sm, marginTop: spacing.md },
   cancelButton: {},
+  reasonInput: {
+    ...typography.body,
+    color: colors.textPrimary,
+    backgroundColor: colors.background,
+    borderRadius: radius.input,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minHeight: 44,
+    maxHeight: 100,
+  },
 });

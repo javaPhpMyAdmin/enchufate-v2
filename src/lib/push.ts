@@ -8,19 +8,25 @@
  */
 import { supabase } from './supabase';
 
+type NotificationType = 'reservations' | 'messages' | 'reviews' | 'promotions';
+
 /**
  * Send a push notification to one or more users.
  * Fails silently — push is best-effort, never blocks the UI.
+ *
+ * @param notificationType - optional type for preference filtering.
+ *   When provided, users who opted out of this type are skipped.
  */
 export async function sendPushNotification(
   userIds: string[],
   title: string,
   body: string,
+  notificationType?: NotificationType,
 ): Promise<void> {
   if (userIds.length === 0) return;
 
   const { error } = await supabase.functions.invoke('send-push', {
-    body: { userIds, title, body },
+    body: { userIds, title, body, notificationType },
   });
 
   if (error) {

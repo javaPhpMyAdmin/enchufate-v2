@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { Clock } from 'lucide-react-native';
+import { Check, CheckCheck, Clock } from 'lucide-react-native';
 
 import { Icon } from '@/components/atoms/Icon';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -27,6 +27,8 @@ export interface MessageBubbleProps {
   timestamp?: string;
   /** Shows a small clock icon next to the body to signal an optimistic insert. */
   pending?: boolean;
+  /** ISO timestamp of when the message was read by the other party. Null = unread. */
+  readAt?: string | null;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -40,6 +42,10 @@ export interface MessageBubbleProps {
  * `system_reservation_cancelled` to render right-aligned orange —
  * that polish lands in Phase 7 with the real system-message-
  * injector Edge Function.
+ *
+ * Read indicator: outgoing user messages show a single tick (sent)
+ * when `readAt` is null/undefined, or a double tick (read) when
+ * `readAt` is set. System messages never show ticks.
  */
 export function MessageBubble({
   body,
@@ -47,6 +53,7 @@ export function MessageBubble({
   isOwn = true,
   timestamp,
   pending = false,
+  readAt,
   style,
 }: MessageBubbleProps): React.JSX.Element {
   const isUser = kind === 'user';
@@ -59,6 +66,10 @@ export function MessageBubble({
   const rowStyle = isRightAligned ? styles.rowUser : styles.rowSystem;
   const bodyStyle = isOutgoing ? styles.bodyUser : styles.bodySystem;
   const timestampStyle = isOutgoing ? styles.timestampUser : styles.timestampSystem;
+
+  // Read indicator: only for outgoing user messages, not system messages.
+  const showReadTick = isOutgoing && !pending;
+  const isRead = showReadTick && Boolean(readAt);
 
   return (
     <View
@@ -75,7 +86,16 @@ export function MessageBubble({
             </View>
           ) : null}
         </View>
-        {timestamp ? <Text style={[styles.timestamp, timestampStyle]}>{timestamp}</Text> : null}
+        <View style={styles.footerRow}>
+          {timestamp ? <Text style={[styles.timestamp, timestampStyle]}>{timestamp}</Text> : null}
+          {showReadTick ? (
+            <Icon
+              icon={isRead ? CheckCheck : Check}
+              size="sm"
+              color={isRead ? colors.textOnPrimary : colors.textSecondary}
+            />
+          ) : null}
+        </View>
       </View>
     </View>
   );
@@ -94,7 +114,8 @@ const styles = StyleSheet.create({
   bodySystem: { color: colors.textPrimary },
   bodyPending: { opacity: 0.7 },
   pendingIcon: { marginLeft: spacing.xs },
-  timestamp: { ...typography.caption, fontSize: 11, marginTop: spacing.xs, opacity: 0.7 },
+  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: spacing.xs, marginTop: spacing.xs },
+  timestamp: { ...typography.caption, fontSize: 11, opacity: 0.7 },
   timestampUser: { color: colors.textOnPrimary, textAlign: 'right' },
   timestampSystem: { color: colors.textSecondary },
 });

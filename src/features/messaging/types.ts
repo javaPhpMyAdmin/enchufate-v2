@@ -30,6 +30,8 @@ export interface Message {
   kind: MessageKind;
   /** Set by `useSendMessage`'s optimistic update; rolled back on error. */
   pending?: boolean;
+  /** ISO timestamp of when the other party read this message. Null = unread. */
+  read_at?: string | null;
   created_at: string;
 }
 

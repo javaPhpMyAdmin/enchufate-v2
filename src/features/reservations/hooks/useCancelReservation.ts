@@ -20,9 +20,8 @@
  * reservation surfaces a typed `AppError` (`code:
  * 'invalid_transition'`) instead of a 4xx RLS response.
  *
- * The optional `reason` is captured for future analytics / push
- * notification copy (v2.1); for MVP it is dropped (the schema has
- * no `cancellation_reason` column).
+ * The optional `reason` is persisted to `cancel_reason` on the
+ * reservation row for analytics and the other party's visibility.
  *
  * Gated by `isFeatureEnabled('RESERVATIONS')`.
  */
@@ -64,8 +63,7 @@ export function useCancelReservation(): UseCancelReservationResult {
     AppError,
     { id: string; currentStatus: ReservationStatus; reason?: string }
   > = useMutation<void, AppError, { id: string; currentStatus: ReservationStatus; reason?: string }>({
-    // eslint-disable-next-line no-unused-vars
-    mutationFn: async ({ id, currentStatus, reason: _reason }) => {
+    mutationFn: async ({ id, currentStatus, reason }) => {
       if (!isFeatureEnabled('RESERVATIONS')) {
         throw new AppError({
           code: 'feature_disabled',
@@ -109,14 +107,18 @@ export function useCancelReservation(): UseCancelReservationResult {
       // ----- REAL Supabase path -----
       // RLS enforces `renter_id = auth.uid() OR is_charger_owner`.
       // The cancelled_by audit field is set to the authed user
-      // (renter or host).
+      // (renter or host). The cancel_reason is optional free-text.
       //
       // The `as any` cast is temporary until
       // `src/lib/database.types.ts` is regenerated via
       // `supabase gen types typescript` after the user runs the
       // migrations. See the equivalent note in
       // `useCreateReservation.ts`.
-      const updatePayload = { status: 'cancelada', cancelled_by: user.id } as never;
+      const updatePayload = {
+        status: 'cancelada',
+        cancelled_by: user.id,
+        ...(reason ? { cancel_reason: reason } : {}),
+      } as never;
       const updateResult = (await (supabase
         .from('reservations' as never)
         .update(updatePayload)

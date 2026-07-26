@@ -15,6 +15,7 @@ import { Star } from 'lucide-react-native';
 import { Card } from '@/components/atoms/Card';
 import { Icon } from '@/components/atoms/Icon';
 import { useChargerRating } from '@/features/reviews/hooks/useChargerRating';
+import { useRespondToReview } from '@/features/reviews/hooks/useRespondToReview';
 import { useReviews } from '@/features/reviews/hooks/useReviews';
 import { isFeatureEnabled } from '@/lib/features';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -23,27 +24,40 @@ import { ReviewCard } from './ReviewCard';
 
 export interface ReviewsSectionProps {
   chargerId: string;
+  /** The charger owner's user id. When set, the owner can respond to reviews. */
+  ownerId?: string;
 }
 
-export function ReviewsSection({ chargerId }: ReviewsSectionProps): React.JSX.Element | null {
+export function ReviewsSection({ chargerId, ownerId }: ReviewsSectionProps): React.JSX.Element | null {
   if (!isFeatureEnabled('CHARGER_REVIEWS')) return null;
 
-  return <ReviewsSectionInner chargerId={chargerId} />;
+  return <ReviewsSectionInner chargerId={chargerId} ownerId={ownerId} />;
 }
 
 /* ------------------------------------------------------------------ */
 /* Inner component (only rendered when the flag is on)                  */
 /* ------------------------------------------------------------------ */
 
-function ReviewsSectionInner({ chargerId }: { chargerId: string }): React.JSX.Element {
+function ReviewsSectionInner({
+  chargerId,
+  ownerId,
+}: {
+  chargerId: string;
+  ownerId?: string;
+}): React.JSX.Element {
   const rating = useChargerRating(chargerId);
   const reviews = useReviews(chargerId);
+  const { respondToReview, isPending: isResponding } = useRespondToReview();
 
   const avgRating = rating.data?.avg_rating ?? 0;
   const reviewCount = rating.data?.review_count ?? 0;
 
   const displayRating = avgRating > 0 ? avgRating.toFixed(1) : '0.0';
   const hasReviews = reviewCount > 0;
+
+  const handleRespond = (reviewId: string, response: string) => {
+    void respondToReview({ reviewId, chargerId, response });
+  };
 
   return (
     <View style={styles.section}>
@@ -80,7 +94,13 @@ function ReviewsSectionInner({ chargerId }: { chargerId: string }): React.JSX.El
       ) : (
         <View style={styles.reviewList}>
           {(reviews.data ?? []).map((review) => (
-            <ReviewCard key={review.id} review={review} />
+            <ReviewCard
+              key={review.id}
+              review={review}
+              isOwner={Boolean(ownerId)}
+              onRespond={handleRespond}
+              isResponding={isResponding}
+            />
           ))}
         </View>
       )}

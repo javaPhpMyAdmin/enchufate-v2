@@ -326,7 +326,7 @@ export default function ChargerDetailScreen() {
         </Card>
 
         {/* Reviews section (feature-gated) */}
-        <ReviewsSection chargerId={chargerId} />
+        <ReviewsSection chargerId={chargerId} ownerId={c.owner_id} />
 
         {/* Description */}
         <Card variant="default" padding="md" style={styles.card}>

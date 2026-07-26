@@ -159,6 +159,7 @@ export type Database = {
           created_at: string
           id: string
           kind: Database["public"]["Enums"]["message_kind"]
+          read_at: string | null
           sender_id: string | null
         }
         Insert: {
@@ -167,6 +168,7 @@ export type Database = {
           created_at?: string
           id?: string
           kind?: Database["public"]["Enums"]["message_kind"]
+          read_at?: string | null
           sender_id?: string | null
         }
         Update: {
@@ -175,6 +177,7 @@ export type Database = {
           created_at?: string
           id?: string
           kind?: Database["public"]["Enums"]["message_kind"]
+          read_at?: string | null
           sender_id?: string | null
         }
         Relationships: [
@@ -189,6 +192,44 @@ export type Database = {
             foreignKeyName: "messages_sender_id_fkey"
             columns: ["sender_id"]
             isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_preferences: {
+        Row: {
+          created_at: string | null
+          messages: boolean
+          promotions: boolean
+          reservations: boolean
+          reviews: boolean
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          messages?: boolean
+          promotions?: boolean
+          reservations?: boolean
+          reviews?: boolean
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          messages?: boolean
+          promotions?: boolean
+          reservations?: boolean
+          reviews?: boolean
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -223,6 +264,7 @@ export type Database = {
       }
       reservations: {
         Row: {
+          cancel_reason: string | null
           cancelled_by: string | null
           charger_id: string
           created_at: string
@@ -235,6 +277,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cancel_reason?: string | null
           cancelled_by?: string | null
           charger_id: string
           created_at?: string
@@ -247,6 +290,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cancel_reason?: string | null
           cancelled_by?: string | null
           charger_id?: string
           created_at?: string
@@ -321,6 +365,8 @@ export type Database = {
           id: string
           rating: number
           reservation_id: string
+          responded_at: string | null
+          response: string | null
           reviewer_id: string
           text: string | null
         }
@@ -330,6 +376,8 @@ export type Database = {
           id?: string
           rating: number
           reservation_id: string
+          responded_at?: string | null
+          response?: string | null
           reviewer_id: string
           text?: string | null
         }
@@ -339,6 +387,8 @@ export type Database = {
           id?: string
           rating?: number
           reservation_id?: string
+          responded_at?: string | null
+          response?: string | null
           reviewer_id?: string
           text?: string | null
         }
