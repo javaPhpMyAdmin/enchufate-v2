@@ -20,6 +20,8 @@ export const colors = {
   successSurface: '#D1FAE5',
   danger: '#DC2626',
   dangerSurface: '#FEE2E2',
+  warning: '#F59E0B',
+  warningSurface: '#FEF3C7',
 
   // Surfaces + borders
   surface: '#FFFFFF',

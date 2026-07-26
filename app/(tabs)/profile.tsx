@@ -23,6 +23,7 @@
  */
 import { useMemo } from 'react';
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -49,6 +50,7 @@ import { useSignOut } from '@/features/auth/hooks/useSignOut';
 import { useMyChargers } from '@/features/profile/hooks/useMyChargers';
 import { useProfile } from '@/features/profile/hooks/useProfile';
 import { useProfileStats } from '@/features/profile/hooks/useProfileStats';
+import { useToggleChargerStatus } from '@/features/chargers/hooks/useToggleChargerStatus';
 import { isFeatureEnabled } from '@/lib/features';
 import { colors, radius, spacing, typography } from '@/theme';
 
@@ -147,6 +149,7 @@ function AuthedState({
   const myChargers = useMyChargers(userId);
   const profileStats = useProfileStats();
   const signOut = useSignOut();
+  const toggleStatus = useToggleChargerStatus();
 
   const memberSince = useMemo(() => {
     if (!profile.data?.created_at) return null;
@@ -249,7 +252,7 @@ function AuthedState({
                   title={c.title}
                   address={c.address}
                   powerKw={c.power_kw}
-                  status={c.status === 'active' ? 'disponible' : 'cancelada'}
+                  status={c.status === 'active' ? 'disponible' : 'paused'}
                   style={styles.chargerCard}
                 />
                 <Button
@@ -262,6 +265,23 @@ function AuthedState({
                     ? () => router.push(`/edit-charger/${c.id}` as never)
                     : () => undefined}
                   style={styles.chargerMenuButton}
+                />
+                <Button
+                  label={c.status === 'active' ? 'Pausar' : 'Reactivar'}
+                  variant={c.status === 'active' ? 'danger' : 'primary'}
+                  size="sm"
+                  loading={toggleStatus.isPending}
+                  onPress={async () => {
+                    try {
+                      await toggleStatus.toggle({ chargerId: c.id, currentStatus: c.status });
+                    } catch (err: any) {
+                      Alert.alert(
+                        'No se pudo cambiar el estado',
+                        err?.userMessage ?? 'Ocurrió un error inesperado.',
+                      );
+                    }
+                  }}
+                  style={styles.chargerToggleButton}
                 />
               </View>
             ))}
@@ -389,6 +409,7 @@ const styles = StyleSheet.create({
   chargerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   chargerCard: { flex: 1 },
   chargerMenuButton: { minWidth: 44, paddingHorizontal: spacing.sm },
+  chargerToggleButton: { minWidth: 72, paddingHorizontal: spacing.sm },
 
   signOutWrap: { marginTop: spacing.lg, paddingHorizontal: spacing.base },
 });

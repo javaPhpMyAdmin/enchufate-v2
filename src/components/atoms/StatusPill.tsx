@@ -8,7 +8,8 @@ export type StatusPillKind =
   | 'confirmada'
   | 'cancelada'
   | 'completada'
-  | 'disponible';
+  | 'disponible'
+  | 'paused';
 
 export interface StatusPillProps {
   status: StatusPillKind;
@@ -21,6 +22,7 @@ const MAP: Record<StatusPillKind, { label: string; bg: string; fg: string; dot: 
   cancelada: { label: 'Cancelada', bg: colors.dangerSurface, fg: colors.danger, dot: colors.danger },
   completada: { label: 'Completada', bg: colors.successSurface, fg: colors.success, dot: colors.success },
   disponible: { label: 'Disponible', bg: colors.successSurface, fg: colors.success, dot: colors.success },
+  paused: { label: 'Pausado', bg: colors.warningSurface, fg: colors.warning, dot: colors.warning },
 };
 
 /** Colored badge for reservation + charger status. */

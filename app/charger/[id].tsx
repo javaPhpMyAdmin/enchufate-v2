@@ -61,6 +61,7 @@ import { ErrorState } from '@/components/molecules/ErrorState';
 import { Skeleton } from '@/components/molecules/Skeleton';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { useCharger } from '@/features/chargers/hooks/useCharger';
+import { useToggleChargerStatus } from '@/features/chargers/hooks/useToggleChargerStatus';
 import { CONNECTOR_LABEL } from '@/features/chargers/types';
 import { useCreateReservation } from '@/features/reservations/hooks/useCreateReservation';
 import { useChargerRating } from '@/features/reviews/hooks/useChargerRating';
@@ -92,6 +93,7 @@ export default function ChargerDetailScreen() {
   const directionsSheetRef = useRef<BottomSheetModal>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
   const createReservation = useCreateReservation();
+  const toggleStatus = useToggleChargerStatus();
 
   const onOpenInMaps = useCallback(() => {
     const data = charger.data;
@@ -262,7 +264,7 @@ export default function ChargerDetailScreen() {
         <Card variant="default" padding="md" style={styles.card}>
           <View style={styles.titleRow}>
             <Text style={styles.title} numberOfLines={2}>{c.title}</Text>
-            <StatusPill status={c.status === 'active' ? 'disponible' : 'cancelada'} />
+            <StatusPill status={c.status === 'active' ? 'disponible' : 'paused'} />
           </View>
           <View style={styles.metaRow}>
             <Icon icon={MapPin} size="sm" color={colors.textSecondary} />
@@ -341,22 +343,39 @@ export default function ChargerDetailScreen() {
         ) : null}
       </ScrollView>
 
-      {/* Sticky CTA — "Reservar" for guests, "Editar" for the owner */}
+      {/* Sticky CTA — "Reservar" for guests, "Editar" + pause/resume for the owner */}
       {session?.user?.id !== c.owner_id ? (
         <View style={[styles.ctaBar, { paddingBottom: insets.bottom + spacing.sm }]}>
           <Button label="Reservar" variant="primary" fullWidth size="lg" onPress={onReservarPress} />
         </View>
-      ) : isFeatureEnabled('EDIT_CHARGER') ? (
+      ) : (
         <View style={[styles.ctaBar, { paddingBottom: insets.bottom + spacing.sm }]}>
-          <Button
-            label="Editar"
-            variant="primary"
-            fullWidth
-            size="lg"
-            onPress={() => router.push(`/edit-charger/${chargerId}` as never)}
-          />
+          {toggleStatus.error ? (
+            <Text style={styles.toggleError}>{toggleStatus.error.userMessage}</Text>
+          ) : null}
+          <View style={styles.ctaOwnerRow}>
+            {isFeatureEnabled('EDIT_CHARGER') ? (
+              <Button
+                label="Editar"
+                variant="secondary"
+                size="md"
+                onPress={() => router.push(`/edit-charger/${chargerId}` as never)}
+                style={styles.ctaOwnerButton}
+              />
+            ) : null}
+            <Button
+              label={c.status === 'active' ? 'Pausar' : 'Reactivar'}
+              variant={c.status === 'active' ? 'danger' : 'primary'}
+              size="md"
+              loading={toggleStatus.isPending}
+              onPress={() =>
+                toggleStatus.toggle({ chargerId: chargerId!, currentStatus: c.status })
+              }
+              style={styles.ctaOwnerButton}
+            />
+          </View>
         </View>
-      ) : null}
+      )}
 
       {/* Reservation duration picker sheet */}
       <BottomSheetModal
@@ -606,6 +625,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+  },
+  ctaOwnerRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  ctaOwnerButton: {
+    flex: 1,
+  },
+  toggleError: {
+    ...typography.caption,
+    color: colors.danger,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
   },
 
   sheetBg: { backgroundColor: colors.surface },
