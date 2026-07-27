@@ -35,6 +35,7 @@ import { chargerSchema, type ScheduleInput } from '@/lib/schemas/charger';
 import { isFeatureEnabled } from '@/lib/features';
 import { queryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
+import type { Currency } from '@/features/chargers/types';
 
 import { useSession } from '@/features/auth/hooks/useSession';
 
@@ -52,6 +53,7 @@ export interface UpdateChargerPayload {
   connector_type?: 'tipo_1' | 'tipo_2' | 'ccs' | 'chademo' | 'tesla';
   power_kw?: number;
   price_per_hour_usd?: number;
+  currency?: Currency;
   min_reservation_minutes?: 30 | 60 | 120 | 240 | 480;
   rules?: string | null;
   schedule?: ScheduleInput;

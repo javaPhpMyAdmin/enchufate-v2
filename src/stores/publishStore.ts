@@ -24,7 +24,7 @@ import { create, type StateCreator } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { chargerSchema } from '@/lib/schemas/charger';
-import type { ChargerSchedule, DayKey, DayWindow, MinReservationMinutes } from '@/features/chargers/types';
+import type { ChargerSchedule, Currency, DayKey, DayWindow, MinReservationMinutes } from '@/features/chargers/types';
 
 /* ------------------------------------------------------------------ */
 /* Types                                                                */
@@ -45,6 +45,8 @@ export interface PublishLocation {
 export interface PublishPricing {
   /** Price in USD per hour. `null` until the user types something. */
   price_per_hour_usd: number | null;
+  /** Currency for the price. Defaults to 'USD'. */
+  currency: Currency;
   /** Minimum reservation duration in minutes. Defaults to 30. */
   min_reservation_minutes: MinReservationMinutes;
 }
@@ -133,6 +135,8 @@ export interface PublishStoreState {
   setPhotos: (uris: string[]) => void;
   /** Replace `price_per_hour_usd` (used by the numeric input). */
   setPricePerHour: (n: number | null) => void;
+  /** Replace `currency` (used by the chip group). */
+  setCurrency: (c: Currency) => void;
   /** Replace `min_reservation_minutes` (used by the chip group). */
   setMinReservation: (m: MinReservationMinutes) => void;
   /** Patch a single day's window array. */
@@ -162,7 +166,7 @@ const INITIAL: Pick<
   connector_type: null,
   power_kw: null,
   photos: [],
-  pricing: { price_per_hour_usd: null, min_reservation_minutes: 30 },
+  pricing: { price_per_hour_usd: null, currency: 'USD', min_reservation_minutes: 30 },
   schedule: DEFAULT_SCHEDULE,
   rules: '',
 };
@@ -346,6 +350,8 @@ const creator: StateCreator<PublishStoreState> = (set) => ({
   setPhotos: (uris) => set({ photos: uris }),
   setPricePerHour: (n) =>
     set((s) => ({ pricing: { ...s.pricing, price_per_hour_usd: n } })),
+  setCurrency: (c) =>
+    set((s) => ({ pricing: { ...s.pricing, currency: c } })),
   setMinReservation: (m) =>
     set((s) => ({ pricing: { ...s.pricing, min_reservation_minutes: m } })),
   setDaySchedule: (k, windows) =>
@@ -370,8 +376,17 @@ const creator: StateCreator<PublishStoreState> = (set) => ({
 export const usePublishStore = create<PublishStoreState>()(
   persist(creator, {
     name: 'enchufate-publish-draft',
-    version: 2,
+    version: 3,
     storage: createJSONStorage(() => AsyncStorage),
+    migrate: (persisted: any, version: number) => {
+      if (version < 3) {
+        // Add default currency to existing in-progress drafts
+        const pricing = persisted?.pricing ?? {};
+        pricing.currency = 'USD';
+        persisted.pricing = pricing;
+      }
+      return persisted as PublishStoreState;
+    },
     // Only persist the data fields — the actions are recreated on
     // every cold start. If we ever add a non-serializable field
     // (functions, Dates), whitelist it here.

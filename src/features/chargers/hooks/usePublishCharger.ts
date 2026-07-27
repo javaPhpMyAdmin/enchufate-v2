@@ -112,6 +112,7 @@ export function usePublishCharger(): UsePublishChargerResult & {
           | 'tesla',
         power_kw: draft.power_kw as number,
         price_per_hour_usd: draft.pricing.price_per_hour_usd as number,
+        currency: draft.pricing.currency,
         min_reservation_minutes: draft.pricing.min_reservation_minutes,
         photos: draft.photos,
         rules: draft.rules.trim().length === 0 ? null : draft.rules,
@@ -170,11 +171,12 @@ export function usePublishCharger(): UsePublishChargerResult & {
         connector_type: payload.connector_type,
         power_kw: payload.power_kw,
         price_per_hour_usd: payload.price_per_hour_usd,
+        currency: payload.currency,
         min_reservation_minutes: payload.min_reservation_minutes,
         photos: publicUrls,
         rules: payload.rules,
         schedule: payload.schedule as any,
-      });
+      } as any);
       if (insertErr) throw normalizeSupabaseError(insertErr);
 
       // ----- 5. Side effects on success -----
