@@ -227,7 +227,7 @@ export default function ThreadScreen() {
           styles.composer,
           {
             paddingBottom: Platform.OS === 'android'
-              ? kbHeight + spacing.sm
+              ? kbHeight + spacing.base
               : Math.max(insets.bottom, spacing.sm) + spacing.sm,
           },
         ]}
