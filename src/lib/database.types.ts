@@ -17,8 +17,10 @@ export type Database = {
       chargers: {
         Row: {
           address: string
+          avg_rating: number | null
           connector_type: Database["public"]["Enums"]["connector_type"]
           created_at: string
+          currency: string
           description: string
           id: string
           lat: number
@@ -28,8 +30,7 @@ export type Database = {
           photos: string[]
           power_kw: number
           price_per_hour_usd: number
-          avg_rating: number
-          review_count: number
+          review_count: number | null
           rules: string | null
           schedule: Json
           status: Database["public"]["Enums"]["charger_status"]
@@ -38,9 +39,10 @@ export type Database = {
         }
         Insert: {
           address: string
+          avg_rating?: number | null
           connector_type: Database["public"]["Enums"]["connector_type"]
-          avg_rating?: number
           created_at?: string
+          currency?: string
           description: string
           id?: string
           lat: number
@@ -50,7 +52,7 @@ export type Database = {
           photos?: string[]
           power_kw: number
           price_per_hour_usd: number
-          review_count?: number
+          review_count?: number | null
           rules?: string | null
           schedule?: Json
           status?: Database["public"]["Enums"]["charger_status"]
@@ -59,9 +61,10 @@ export type Database = {
         }
         Update: {
           address?: string
+          avg_rating?: number | null
           connector_type?: Database["public"]["Enums"]["connector_type"]
-          avg_rating?: number
           created_at?: string
+          currency?: string
           description?: string
           id?: string
           lat?: number
@@ -71,7 +74,7 @@ export type Database = {
           photos?: string[]
           power_kw?: number
           price_per_hour_usd?: number
-          review_count?: number
+          review_count?: number | null
           rules?: string | null
           schedule?: Json
           status?: Database["public"]["Enums"]["charger_status"]
@@ -139,6 +142,13 @@ export type Database = {
           {
             foreignKeyName: "conversations_host_id_fkey"
             columns: ["host_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_last_message_sender_id_fkey"
+            columns: ["last_message_sender_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -262,6 +272,30 @@ export type Database = {
         }
         Relationships: []
       }
+      push_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          platform: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          platform: string
+          token: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          platform?: string
+          token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       reservations: {
         Row: {
           cancel_reason: string | null
@@ -326,38 +360,6 @@ export type Database = {
           },
         ]
       }
-      push_tokens: {
-        Row: {
-          created_at: string
-          id: string
-          platform: string
-          token: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          platform: string
-          token: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          platform?: string
-          token?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "push_tokens_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       reviews: {
         Row: {
           charger_id: string
@@ -403,7 +405,7 @@ export type Database = {
           {
             foreignKeyName: "reviews_reservation_id_fkey"
             columns: ["reservation_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "reservations"
             referencedColumns: ["id"]
           },
