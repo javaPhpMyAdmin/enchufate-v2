@@ -144,7 +144,8 @@ export default function ChargerDetailScreen() {
     const data = charger.data;
     if (!data) return;
     const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${data.lat},${data.lng}`;
-    const message = `🔌 Encontré un cargador en Enchúfate:\n\n${data.title}\n📍 ${data.address}\n⚡ ${data.power_kw} kW · ${CONNECTOR_LABEL[data.connector_type]}\n💰 $${data.price_per_hour_usd}/hora\n\n${mapsUrl}`;
+    const priceDisplay = formatPrice(data.price_per_hour_usd, data.currency ?? 'USD');
+    const message = `🔌 Encontré un cargador en Enchúfate:\n\n${data.title}\n📍 ${data.address}\n⚡ ${data.power_kw} kW · ${CONNECTOR_LABEL[data.connector_type]}\n💰 ${priceDisplay}/hora\n\n${mapsUrl}`;
     await Share.share({ message }, { dialogTitle: 'Compartir cargador' });
   }, [charger.data]);
 
@@ -290,7 +291,7 @@ export default function ChargerDetailScreen() {
             </Text>
           </View>
           <Text style={styles.price} numberOfLines={1}>
-            {formatPrice(c.price_per_hour_usd, 'USD')}<Text style={styles.priceSuffix}> / hora</Text>
+            {formatPrice(c.price_per_hour_usd, c.currency ?? 'USD')}<Text style={styles.priceSuffix}> / hora</Text>
           </Text>
         </Card>
 
