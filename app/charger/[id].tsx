@@ -326,10 +326,9 @@ export default function ChargerDetailScreen() {
                   {(() => {
                     const avg = chargerRating.data?.avg_rating ?? 0;
                     const count = chargerRating.data?.review_count ?? 0;
+                    if (count === 0) return null;
                     const displayAvg = avg > 0 ? avg.toFixed(1) : '0.0';
-                    return count > 0
-                      ? `${displayAvg} · ${count} reseña${count === 1 ? '' : 's'}`
-                      : '0.0 · sin reseñas todavía';
+                    return `${displayAvg} · ${count} reseña${count === 1 ? '' : 's'}`;
                   })()}
                 </Text>
               </View>
