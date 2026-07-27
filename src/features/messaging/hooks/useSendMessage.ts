@@ -99,9 +99,6 @@ export function useSendMessage(
         );
       }
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
-    },
   });
 
   return {
