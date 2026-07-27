@@ -1,5 +1,5 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import React, { type ReactNode } from 'react';
+import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { MapPin, Zap } from 'lucide-react-native';
 
 import { Avatar } from '@/components/atoms/Avatar';
@@ -19,6 +19,8 @@ export interface ChargerCardProps {
   hostAvatarUri?: string | null;
   /** Whole-card press handler; navigates to charger detail in Phase 6. */
   onPress?: () => void;
+  /** Optional accessory rendered in the footer row (e.g. action buttons). */
+  footerAccessory?: ReactNode;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -42,6 +44,7 @@ export function ChargerCard({
   hostName,
   hostAvatarUri,
   onPress,
+  footerAccessory,
   style,
 }: ChargerCardProps): React.JSX.Element {
   return (
@@ -62,10 +65,13 @@ export function ChargerCard({
         <StatusPill status={status} />
       </View>
       <View style={styles.footer}>
-        <View style={styles.row}>
-          <Icon icon={Zap} size="sm" color={colors.primary} />
-          <Text style={styles.power}>{formatPower(powerKw)}</Text>
+        <View style={styles.footerLeft}>
+          <View style={styles.row}>
+            <Icon icon={Zap} size="sm" color={colors.primary} />
+            <Text style={styles.power}>{formatPower(powerKw)}</Text>
+          </View>
         </View>
+        {footerAccessory ? <View style={styles.footerRight}>{footerAccessory}</View> : null}
       </View>
     </Card>
   );
@@ -81,6 +87,16 @@ const styles = StyleSheet.create({
   title: { ...typography.heading, color: colors.textPrimary },
   address: { ...typography.caption, color: colors.textSecondary, flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  footer: { marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
+  footer: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  footerLeft: { flex: 1 },
+  footerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   power: { ...typography.caption, color: colors.textPrimary, fontWeight: '600' },
 });

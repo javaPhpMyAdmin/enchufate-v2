@@ -247,43 +247,38 @@ function AuthedState({
         ) : (
           <View style={styles.chargerList}>
             {chargers.map((c) => (
-              <View key={c.id} style={styles.chargerRow}>
-                <ChargerCard
-                  title={c.title}
-                  address={c.address}
-                  powerKw={c.power_kw}
-                  status={c.status === 'active' ? 'disponible' : 'paused'}
-                  style={styles.chargerCard}
-                />
-                <Button
-                  label="⋯"
-                  variant="ghost"
-                  size="sm"
-                  disabled={!isFeatureEnabled('EDIT_CHARGER')}
-                  accessibilityLabel="Editar cargador"
-                  onPress={isFeatureEnabled('EDIT_CHARGER')
+              <ChargerCard
+                key={c.id}
+                title={c.title}
+                address={c.address}
+                powerKw={c.power_kw}
+                status={c.status === 'active' ? 'disponible' : 'paused'}
+                onPress={
+                  isFeatureEnabled('EDIT_CHARGER')
                     ? () => router.push(`/edit-charger/${c.id}` as never)
-                    : () => undefined}
-                  style={styles.chargerMenuButton}
-                />
-                <Button
-                  label={c.status === 'active' ? 'Pausar' : 'Reactivar'}
-                  variant={c.status === 'active' ? 'danger' : 'primary'}
-                  size="sm"
-                  loading={toggleStatus.isPending}
-                  onPress={async () => {
-                    try {
-                      await toggleStatus.toggle({ chargerId: c.id, currentStatus: c.status });
-                    } catch (err: any) {
-                      Alert.alert(
-                        'No se pudo cambiar el estado',
-                        err?.userMessage ?? 'Ocurrió un error inesperado.',
-                      );
-                    }
-                  }}
-                  style={styles.chargerToggleButton}
-                />
-              </View>
+                    : undefined
+                }
+                footerAccessory={
+                  <View style={styles.chargerActions}>
+                    <Button
+                      label={c.status === 'active' ? 'Pausar' : 'Reactivar'}
+                      variant={c.status === 'active' ? 'danger' : 'primary'}
+                      size="sm"
+                      loading={toggleStatus.isPending}
+                      onPress={async () => {
+                        try {
+                          await toggleStatus.toggle({ chargerId: c.id, currentStatus: c.status });
+                        } catch (err: any) {
+                          Alert.alert(
+                            'No se pudo cambiar el estado',
+                            err?.userMessage ?? 'Ocurrió un error inesperado.',
+                          );
+                        }
+                      }}
+                    />
+                  </View>
+                }
+              />
             ))}
           </View>
         )}
@@ -406,10 +401,7 @@ const styles = StyleSheet.create({
   publishPill: { paddingHorizontal: spacing.md },
   emptyHint: { ...typography.body, color: colors.textSecondary, textAlign: 'center', paddingVertical: spacing.xl },
   chargerList: { gap: spacing.sm },
-  chargerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  chargerCard: { flex: 1 },
-  chargerMenuButton: { minWidth: 44, paddingHorizontal: spacing.sm },
-  chargerToggleButton: { minWidth: 72, paddingHorizontal: spacing.sm },
+  chargerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
 
   signOutWrap: { marginTop: spacing.lg, paddingHorizontal: spacing.base },
 });
