@@ -656,29 +656,9 @@ function EditChargerSkeleton({ topInset }: { topInset: number }): React.JSX.Elem
         <View style={styles.backButtonPlaceholder} />
         <Text style={styles.headerTitle} numberOfLines={1}>Editar cargador</Text>
       </View>
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: topInset + spacing.xxl + 80 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.card}>
-          <Skeleton width="40%" height={18} />
-          <Skeleton width="100%" height={48} style={styles.skeletonSpacerSm} />
-          <Skeleton width="100%" height={48} style={styles.skeletonSpacerSm} />
-        </View>
-        <View style={styles.card}>
-          <Skeleton width="35%" height={18} />
-          <Skeleton width="100%" height={48} style={styles.skeletonSpacerSm} />
-        </View>
-        <View style={styles.card}>
-          <Skeleton width="30%" height={18} />
-          <Skeleton width="80%" height={32} style={styles.skeletonSpacerSm} />
-          <Skeleton width="60%" height={48} style={styles.skeletonSpacerSm} />
-        </View>
-        <View style={styles.card}>
-          <Skeleton width="25%" height={18} />
-          <Skeleton width="100%" height={120} style={styles.skeletonSpacerSm} />
-        </View>
-      </ScrollView>
+      <View style={styles.skeletonCenter}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
     </View>
   );
 }
@@ -704,6 +684,8 @@ const styles = StyleSheet.create({
   headerTitle: { ...typography.heading, color: colors.textPrimary, flex: 1 },
 
   scroll: { padding: spacing.base, gap: spacing.base },
+
+  skeletonCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   card: { gap: spacing.sm },
 
