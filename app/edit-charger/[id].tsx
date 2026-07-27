@@ -22,7 +22,7 @@
  * publish wizard's `6-schedule.tsx` but operates on local state
  * instead of the Zustand store.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -36,9 +36,10 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, ImagePlus, X } from 'lucide-react-native';
+import { Camera, ChevronLeft, ChevronRight, Clock, ImagePlus, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { BottomSheetModal, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 
 import { Button } from '@/components/atoms/Button';
 import { Card } from '@/components/atoms/Card';
@@ -135,6 +136,10 @@ export default function EditChargerScreen(): React.JSX.Element {
   const { session } = useSession();
   const charger = useCharger(chargerId);
   const { updateCharger, isPending, error: mutationError, reset: resetMutation } = useUpdateCharger();
+
+  /* ---- Bottom sheet refs ---- */
+  const photoSheetRef = useRef<BottomSheetModal>(null);
+  const scheduleSheetRef = useRef<BottomSheetModal>(null);
 
   /* ---- Form state ---- */
   const [title, setTitle] = useState('');
@@ -392,6 +397,18 @@ export default function EditChargerScreen(): React.JSX.Element {
     ...photoState.added.map((uri, i) => ({ key: `added-${i}`, uri, type: 'added' as const })),
   ];
 
+  /* ---- Schedule summary text ---- */
+  const allDaysAlways = DAY_KEYS.every((k) => modeForDay(schedule[k]) === 'always');
+  const allDaysClosed = DAY_KEYS.every((k) => modeForDay(schedule[k]) === 'closed');
+  const scheduleSummary = allDaysAlways
+    ? 'Disponible todos los días'
+    : allDaysClosed
+      ? 'Cerrado todos los días'
+      : (() => {
+          const openDays = DAY_KEYS.filter((k) => modeForDay(schedule[k]) !== 'closed');
+          return `${openDays.length} de ${DAY_KEYS.length} días activos`;
+        })();
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -470,54 +487,86 @@ export default function EditChargerScreen(): React.JSX.Element {
           />
         </Card>
 
-        {/* ---- Photos ---- */}
-        <Card variant="default" padding="md" style={styles.card}>
-          <Text style={styles.sectionTitle}>Fotos</Text>
-          <View style={styles.photoGrid}>
-            {displayPhotos.map((photo) => (
-              <View key={photo.key} style={styles.photoCell}>
-                <Image source={{ uri: photo.uri }} style={styles.photoThumb} resizeMode="cover" />
-                <Pressable
-                  onPress={() =>
-                    photo.type === 'retained'
-                      ? onDeleteRetained(photo.uri)
-                      : onDeleteAdded(parseInt(photo.key.replace('added-', ''), 10))
-                  }
-                  accessibilityRole="button"
-                  accessibilityLabel="Quitar foto"
-                  hitSlop={8}
-                  style={styles.photoDeleteBtn}
-                >
-                  <X size={16} color={colors.textOnPrimary} strokeWidth={3} />
-                </Pressable>
+        {/* ---- Photos summary ---- */}
+        <Pressable
+          onPress={() => photoSheetRef.current?.present()}
+          accessibilityRole="button"
+          accessibilityLabel="Editar fotos"
+        >
+          <Card variant="default" padding="md" style={styles.card}>
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryLeft}>
+                <Camera size={20} color={colors.textSecondary} />
+                <Text style={styles.sectionTitle}>Fotos</Text>
               </View>
-            ))}
-            {totalPhotoCount < PHOTO_MAX ? (
-              <Pressable
-                onPress={onPickPhotos}
-                disabled={photoBusy}
-                accessibilityRole="button"
-                accessibilityLabel="Agregar fotos"
-                style={({ pressed }) => [
-                  styles.photoCell,
-                  styles.photoAddCell,
-                  { opacity: photoBusy ? 0.5 : pressed ? 0.85 : 1 },
-                ]}
-              >
-                <ImagePlus size={28} color={colors.primary} />
-                <Text style={styles.photoAddLabel}>Agregar</Text>
-              </Pressable>
+              <View style={styles.summaryRight}>
+                <Text style={styles.summaryDetail}>
+                  {totalPhotoCount} de {PHOTO_MAX} seleccionadas
+                </Text>
+                <ChevronRight size={18} color={colors.textSecondary} />
+              </View>
+            </View>
+          </Card>
+        </Pressable>
+
+        {/* ---- Photos sheet ---- */}
+        <BottomSheetModal
+          ref={photoSheetRef}
+          snapPoints={['60%']}
+          enableDynamicSizing={false}
+          backdropComponent={(p) => (
+            <BottomSheetBackdrop {...p} appearsOnIndex={0} disappearsOnIndex={-1} />
+          )}
+          backgroundStyle={styles.sheetBg}
+        >
+          <View style={styles.sheetContent}>
+            <Text style={styles.sheetTitle}>Fotos</Text>
+            <View style={styles.photoGrid}>
+              {displayPhotos.map((photo) => (
+                <View key={photo.key} style={styles.photoCell}>
+                  <Image source={{ uri: photo.uri }} style={styles.photoThumb} resizeMode="cover" />
+                  <Pressable
+                    onPress={() =>
+                      photo.type === 'retained'
+                        ? onDeleteRetained(photo.uri)
+                        : onDeleteAdded(parseInt(photo.key.replace('added-', ''), 10))
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel="Quitar foto"
+                    hitSlop={8}
+                    style={styles.photoDeleteBtn}
+                  >
+                    <X size={16} color={colors.textOnPrimary} strokeWidth={3} />
+                  </Pressable>
+                </View>
+              ))}
+              {totalPhotoCount < PHOTO_MAX ? (
+                <Pressable
+                  onPress={onPickPhotos}
+                  disabled={photoBusy}
+                  accessibilityRole="button"
+                  accessibilityLabel="Agregar fotos"
+                  style={({ pressed }) => [
+                    styles.photoCell,
+                    styles.photoAddCell,
+                    { opacity: photoBusy ? 0.5 : pressed ? 0.85 : 1 },
+                  ]}
+                >
+                  <ImagePlus size={28} color={colors.primary} />
+                  <Text style={styles.photoAddLabel}>Agregar</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            <Text style={styles.photoCounter}>
+              {totalPhotoCount} de {PHOTO_MAX} seleccionadas
+            </Text>
+            {photoError ? (
+              <View style={styles.hint}>
+                <Text style={styles.hintText}>{photoError}</Text>
+              </View>
             ) : null}
           </View>
-          <Text style={styles.photoCounter}>
-            {totalPhotoCount} de {PHOTO_MAX} seleccionadas
-          </Text>
-          {photoError ? (
-            <View style={styles.hint}>
-              <Text style={styles.hintText}>{photoError}</Text>
-            </View>
-          ) : null}
-        </Card>
+        </BottomSheetModal>
 
         {/* ---- Pricing ---- */}
         <Card variant="default" padding="md" style={styles.card}>
@@ -544,67 +593,97 @@ export default function EditChargerScreen(): React.JSX.Element {
           </View>
         </Card>
 
-        {/* ---- Schedule ---- */}
-        <Card variant="default" padding="md" style={styles.card}>
-          <Text style={styles.sectionTitle}>Horario</Text>
-          {DAY_KEYS.map((k) => {
-            const mode = modeForDay(schedule[k]);
-            const custom = customRange[k];
-            return (
-              <View key={k} style={styles.dayRow}>
-                <View style={styles.dayHeader}>
-                  <Text style={styles.dayLabel}>{DAY_LABELS[k]}</Text>
-                  {mode === 'always' ? (
-                    <Text style={styles.dayStatus}>24hs</Text>
-                  ) : mode === 'closed' ? (
-                    <Text style={styles.dayStatus}>Cerrado</Text>
-                  ) : null}
-                </View>
-                <View style={styles.dayChips}>
-                  <Chip
-                    label="Disponible"
-                    selected={mode === 'always'}
-                    onPress={() => onPickDayMode(k, 'always')}
-                    size="sm"
-                  />
-                  <Chip
-                    label="Personalizar"
-                    selected={mode === 'custom'}
-                    onPress={() => onPickDayMode(k, 'custom')}
-                    size="sm"
-                  />
-                  <Chip
-                    label="No disponible"
-                    selected={mode === 'closed'}
-                    onPress={() => onPickDayMode(k, 'closed')}
-                    size="sm"
-                  />
-                </View>
-                {mode === 'custom' && custom ? (
-                  <View style={styles.customTimeRow}>
-                    <Input
-                      value={custom.from}
-                      onChangeText={(v) => onChangeCustomTime(k, 'from', v)}
-                      placeholder="HH:MM"
-                      keyboardType="numbers-and-punctuation"
-                      autoCorrect={false}
-                      style={styles.customTimeInput}
+        {/* ---- Schedule summary ---- */}
+        <Pressable
+          onPress={() => scheduleSheetRef.current?.present()}
+          accessibilityRole="button"
+          accessibilityLabel="Editar horario"
+        >
+          <Card variant="default" padding="md" style={styles.card}>
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryLeft}>
+                <Clock size={20} color={colors.textSecondary} />
+                <Text style={styles.sectionTitle}>Horario</Text>
+              </View>
+              <View style={styles.summaryRight}>
+                <Text style={styles.summaryDetail}>{scheduleSummary}</Text>
+                <ChevronRight size={18} color={colors.textSecondary} />
+              </View>
+            </View>
+          </Card>
+        </Pressable>
+
+        {/* ---- Schedule sheet ---- */}
+        <BottomSheetModal
+          ref={scheduleSheetRef}
+          snapPoints={['75%']}
+          enableDynamicSizing={false}
+          backdropComponent={(p) => (
+            <BottomSheetBackdrop {...p} appearsOnIndex={0} disappearsOnIndex={-1} />
+          )}
+          backgroundStyle={styles.sheetBg}
+        >
+          <View style={styles.sheetContent}>
+            <Text style={styles.sheetTitle}>Horario</Text>
+            {DAY_KEYS.map((k) => {
+              const mode = modeForDay(schedule[k]);
+              const custom = customRange[k];
+              return (
+                <View key={k} style={styles.dayRow}>
+                  <View style={styles.dayHeader}>
+                    <Text style={styles.dayLabel}>{DAY_LABELS[k]}</Text>
+                    {mode === 'always' ? (
+                      <Text style={styles.dayStatus}>24hs</Text>
+                    ) : mode === 'closed' ? (
+                      <Text style={styles.dayStatus}>Cerrado</Text>
+                    ) : null}
+                  </View>
+                  <View style={styles.dayChips}>
+                    <Chip
+                      label="Disponible"
+                      selected={mode === 'always'}
+                      onPress={() => onPickDayMode(k, 'always')}
+                      size="sm"
                     />
-                    <Text style={styles.customDash}>—</Text>
-                    <Input
-                      value={custom.to}
-                      onChangeText={(v) => onChangeCustomTime(k, 'to', v)}
-                      placeholder="HH:MM"
-                      keyboardType="numbers-and-punctuation"
-                      autoCorrect={false}
-                      style={styles.customTimeInput}
+                    <Chip
+                      label="Personalizar"
+                      selected={mode === 'custom'}
+                      onPress={() => onPickDayMode(k, 'custom')}
+                      size="sm"
+                    />
+                    <Chip
+                      label="No disponible"
+                      selected={mode === 'closed'}
+                      onPress={() => onPickDayMode(k, 'closed')}
+                      size="sm"
                     />
                   </View>
-                ) : null}
-              </View>
-            );
-          })}
-        </Card>
+                  {mode === 'custom' && custom ? (
+                    <View style={styles.customTimeRow}>
+                      <Input
+                        value={custom.from}
+                        onChangeText={(v) => onChangeCustomTime(k, 'from', v)}
+                        placeholder="HH:MM"
+                        keyboardType="numbers-and-punctuation"
+                        autoCorrect={false}
+                        style={styles.customTimeInput}
+                      />
+                      <Text style={styles.customDash}>—</Text>
+                      <Input
+                        value={custom.to}
+                        onChangeText={(v) => onChangeCustomTime(k, 'to', v)}
+                        placeholder="HH:MM"
+                        keyboardType="numbers-and-punctuation"
+                        autoCorrect={false}
+                        style={styles.customTimeInput}
+                      />
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+        </BottomSheetModal>
 
         {/* ---- Rules ---- */}
         <Card variant="default" padding="md" style={styles.card}>
@@ -745,6 +824,24 @@ const styles = StyleSheet.create({
   photoAddLabel: { ...typography.caption, color: colors.primary, fontWeight: '600' },
   photoCounter: { ...typography.caption, color: colors.textSecondary, textAlign: 'center' },
 
+  /* ---- Summary cards ---- */
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  summaryLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  summaryRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  summaryDetail: { ...typography.caption, color: colors.textSecondary },
+
   /* ---- Schedule ---- */
   dayRow: {
     gap: spacing.sm,
@@ -793,6 +890,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
+
+  /* ---- Bottom sheet ---- */
+  sheetBg: { backgroundColor: colors.surface },
+  sheetContent: { padding: spacing.lg, gap: spacing.base },
+  sheetTitle: { ...typography.title, color: colors.textPrimary },
 
   /* ---- Skeleton ---- */
   backButtonPlaceholder: { width: 24, height: 24 },
