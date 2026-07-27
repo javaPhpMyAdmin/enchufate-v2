@@ -349,7 +349,7 @@ export default function EditChargerScreen(): React.JSX.Element {
     );
   }
 
-  if (charger.isLoading) {
+  if (charger.isLoading || !session) {
     return <EditChargerSkeleton topInset={insets.top} />;
   }
 
