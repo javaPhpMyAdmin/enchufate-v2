@@ -89,9 +89,7 @@ function ReviewsSectionInner({
             <Text style={styles.retryText}>Reintentar</Text>
           </Pressable>
         </Card>
-      ) : !hasReviews ? (
-        <Text style={styles.emptyText}>Sin reseñas todavía</Text>
-      ) : (
+      ) : hasReviews ? (
         <View style={styles.reviewList}>
           {(reviews.data ?? []).map((review) => (
             <ReviewCard
@@ -103,7 +101,7 @@ function ReviewsSectionInner({
             />
           ))}
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -123,13 +121,6 @@ const styles = StyleSheet.create({
   errorText: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   retryButton: { paddingVertical: spacing.xs, paddingHorizontal: spacing.md },
   retryText: { ...typography.caption, color: colors.primary, fontWeight: '600' },
-
-  emptyText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    paddingVertical: spacing.lg,
-  },
 
   reviewList: { gap: spacing.sm },
 });
