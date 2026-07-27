@@ -28,6 +28,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -36,7 +37,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Camera, ChevronLeft, ChevronRight, Clock, ImagePlus, X } from 'lucide-react-native';
+import { Camera, CheckCircle2, ChevronLeft, ChevronRight, Clock, ImagePlus, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { BottomSheetModal, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
@@ -171,6 +172,7 @@ export default function EditChargerScreen(): React.JSX.Element {
   });
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   /* ---- Schedule custom ranges (UI-only) ---- */
   const [customRange, setCustomRange] = useState<Record<DayKey, { from: string; to: string } | null>>({
@@ -334,7 +336,7 @@ export default function EditChargerScreen(): React.JSX.Element {
           add: photoState.added,
         },
       });
-      router.back();
+      setShowSuccess(true);
     } catch (e) {
       // Mutation error is already captured in `mutationError`.
       // If the error is unexpected, show an alert.
@@ -726,6 +728,28 @@ export default function EditChargerScreen(): React.JSX.Element {
           onPress={onSave}
         />
       </View>
+
+      {/* ---- Success modal ---- */}
+      <Modal visible={showSuccess} transparent animationType="fade" onRequestClose={() => {}}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <CheckCircle2 size={64} color={colors.success} strokeWidth={2} />
+            <Text style={styles.modalTitle}>¡Cambios guardados!</Text>
+            <Text style={styles.modalBody}>
+              Los datos de tu cargador se actualizaron correctamente.
+            </Text>
+            <Button
+              label="Continuar"
+              variant="primary"
+              fullWidth
+              onPress={() => {
+                setShowSuccess(false);
+                router.back();
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -903,6 +927,35 @@ const styles = StyleSheet.create({
   sheetBg: { backgroundColor: colors.surface },
   sheetContent: { padding: spacing.lg, gap: spacing.base },
   sheetTitle: { ...typography.title, color: colors.textPrimary },
+
+  /* ---- Success modal ---- */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    padding: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.md,
+    width: '100%',
+    maxWidth: 360,
+  },
+  modalTitle: {
+    ...typography.heading,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  modalBody: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
 
   /* ---- Skeleton ---- */
   backButtonPlaceholder: { width: 24, height: 24 },
