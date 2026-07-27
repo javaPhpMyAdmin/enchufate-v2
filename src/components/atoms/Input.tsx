@@ -39,6 +39,9 @@ export interface InputProps {
   returnKeyType?: TextInputProps['returnKeyType'];
   onSubmitEditing?: TextInputProps['onSubmitEditing'];
   maxLength?: number;
+  multiline?: boolean;
+  numberOfLines?: number;
+  textAlignVertical?: TextInputProps['textAlignVertical'];
   style?: StyleProp<ViewStyle>;
 }
 
@@ -63,6 +66,9 @@ export function Input({
   returnKeyType,
   onSubmitEditing,
   maxLength,
+  multiline = false,
+  numberOfLines,
+  textAlignVertical,
   style,
 }: InputProps): React.JSX.Element {
   const [hidden, setHidden] = useState(secureTextEntry);
@@ -102,6 +108,9 @@ export function Input({
           returnKeyType={returnKeyType}
           onSubmitEditing={onSubmitEditing}
           maxLength={maxLength}
+          multiline={multiline}
+          numberOfLines={numberOfLines}
+          textAlignVertical={textAlignVertical}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={[styles.input, typography.body, { color: colors.textPrimary }]}

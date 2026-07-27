@@ -85,6 +85,8 @@ export default function PublishStep1Name(): React.JSX.Element {
             onChangeText={onNameChange}
             placeholder="Ej: Cargador rápido del garage"
             autoCapitalize="sentences"
+            multiline
+            numberOfLines={2}
           />
           <Text style={styles.counter}>
             {name.length}/{TITLE_MAX}
@@ -98,6 +100,8 @@ export default function PublishStep1Name(): React.JSX.Element {
             onChangeText={onDescriptionChange}
             placeholder="Contá detalles útiles: tipo de conector, si hay estacionamiento techado, etc."
             autoCapitalize="sentences"
+            multiline
+            numberOfLines={4}
           />
           <Text style={styles.counter}>
             {description.length}/{DESCRIPTION_MAX}

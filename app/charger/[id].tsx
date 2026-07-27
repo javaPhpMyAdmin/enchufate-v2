@@ -281,18 +281,23 @@ export default function ChargerDetailScreen() {
             <StatusPill status={c.status === 'active' ? 'disponible' : 'paused'} />
           </View>
           <View style={styles.metaRow}>
-            <Icon icon={MapPin} size="sm" color={colors.textSecondary} />
+            <Icon icon={MapPin} size="md" color={colors.danger} />
             <Text style={styles.metaText} numberOfLines={2}>{c.address}</Text>
           </View>
-          <View style={styles.metaRow}>
-            <Icon icon={Zap} size="sm" color={colors.primary} />
-            <Text style={styles.metaText}>
-              {`${c.power_kw % 1 === 0 ? c.power_kw : c.power_kw.toFixed(1)} kW · ${CONNECTOR_LABEL[c.connector_type]}`}
-            </Text>
+          <View style={styles.infoBadges}>
+            <View style={styles.infoBadge}>
+              <Icon icon={Zap} size="sm" color={colors.primary} />
+              <Text style={styles.infoBadgeText}>
+                {`${c.power_kw % 1 === 0 ? c.power_kw : c.power_kw.toFixed(1)} kW · ${CONNECTOR_LABEL[c.connector_type]}`}
+              </Text>
+            </View>
+            <View style={styles.infoBadge}>
+              <Text style={styles.price}>
+                {formatPrice(c.price_per_hour_usd, c.currency ?? 'USD')}
+                <Text style={styles.priceSuffix}> / hora</Text>
+              </Text>
+            </View>
           </View>
-          <Text style={styles.price} numberOfLines={1}>
-            {formatPrice(c.price_per_hour_usd, c.currency ?? 'USD')}<Text style={styles.priceSuffix}> / hora</Text>
-          </Text>
         </Card>
 
         {/* Directions card */}
@@ -594,8 +599,20 @@ const styles = StyleSheet.create({
   card: { gap: spacing.sm },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
   title: { ...typography.title, color: colors.textPrimary, flex: 1 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.xs },
   metaText: { ...typography.body, color: colors.textSecondary, flex: 1 },
+  infoBadges: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  infoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.chip,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  infoBadgeText: { ...typography.caption, color: colors.textPrimary, fontWeight: '600' },
   price: { ...typography.heading, color: colors.primary, fontWeight: '700' },
   priceSuffix: { ...typography.body, color: colors.textSecondary, fontWeight: '400' },
 
