@@ -58,13 +58,17 @@ export function useMessages(
           queryClient.setQueryData<Message[]>(
             QUERY_KEY(conversationId),
             (old) => {
+              const incoming = payload.new;
+              // If a message with this ID already exists (e.g. from a refetch),
+              // skip to avoid duplicates.
+              if ((old ?? []).some((m) => m.id === incoming.id)) return old;
               // Replace any pending optimistic message with the same body + sender
               // so we don't show a brief duplicate flash.
               const withoutOptimistic = (old ?? []).filter(
                 (m) =>
-                  !(m.pending && m.body === payload.new.body && m.sender_id === payload.new.sender_id),
+                  !(m.pending && m.body === incoming.body && m.sender_id === incoming.sender_id),
               );
-              return [...withoutOptimistic, payload.new];
+              return [...withoutOptimistic, incoming];
             },
           );
         },
