@@ -137,6 +137,9 @@ export default function EditChargerScreen(): React.JSX.Element {
   const charger = useCharger(chargerId);
   const { updateCharger, isPending, error: mutationError, reset: resetMutation } = useUpdateCharger();
 
+  /* ---- Form ready gate ---- */
+  const [formReady, setFormReady] = useState(false);
+
   /* ---- Bottom sheet refs ---- */
   const photoSheetRef = useRef<BottomSheetModal>(null);
   const scheduleSheetRef = useRef<BottomSheetModal>(null);
@@ -210,6 +213,9 @@ export default function EditChargerScreen(): React.JSX.Element {
 
     // Initialize photo state — all existing photos are "retained"
     setPhotoState({ retained: c.photos ?? [], added: [], removed: [] });
+
+    // Mark form as ready — skeleton can now be dismissed
+    setFormReady(true);
   }, [charger.data]);
 
   /* ---- Owner guard ---- */
@@ -354,7 +360,7 @@ export default function EditChargerScreen(): React.JSX.Element {
     );
   }
 
-  if (charger.isLoading || !session) {
+  if (charger.isLoading || !session || !formReady) {
     return <EditChargerSkeleton topInset={insets.top} />;
   }
 
@@ -737,6 +743,7 @@ function EditChargerSkeleton({ topInset }: { topInset: number }): React.JSX.Elem
       </View>
       <View style={styles.skeletonCenter}>
         <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.skeletonLabel}>Obteniendo datos…</Text>
       </View>
     </View>
   );
@@ -765,6 +772,7 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.base, gap: spacing.base },
 
   skeletonCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  skeletonLabel: { ...typography.body, color: colors.textSecondary, marginTop: spacing.md },
 
   card: { gap: spacing.sm },
 
