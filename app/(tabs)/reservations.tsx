@@ -242,6 +242,8 @@ function ReservationRow({
       status={reservation.status}
       chargerTitle={reservation.charger_title}
       address={reservation.charger_address}
+      lat={reservation.charger_lat}
+      lng={reservation.charger_lng}
       timeBlock={time}
       powerKw={reservation.charger_power_kw}
       otherPartyName={party.name}

@@ -64,6 +64,7 @@ import { useConfirmReservation } from '@/features/reservations/hooks/useConfirmR
 import { useReservation } from '@/features/reservations/hooks/useReservation';
 import { useNotifyCompletion } from '@/features/reservations/hooks/useNotifyCompletion';
 import { useReviewEligibility } from '@/features/reviews/hooks/useReviewEligibility';
+import { useResolvedAddress } from '@/features/chargers/hooks/useResolvedAddress';
 import {
   isCancellable,
   otherParty,
@@ -85,6 +86,13 @@ export default function ReservationDetailScreen() {
   const { cancel, isPending: isCancelling, error: cancelError } = useCancelReservation();
   const { confirm, isPending: isConfirming, error: confirmError } = useConfirmReservation();
   const reviewEligibility = useReviewEligibility(reservationId);
+
+  // Resolve coordinate addresses to human-readable form
+  const resolvedAddress = useResolvedAddress(
+    reservation.data?.charger_address ?? '',
+    reservation.data?.charger_lat ?? 0,
+    reservation.data?.charger_lng ?? 0,
+  );
 
   // Send a review-prompt push when the reservation transitions to
   // `completada` (set by DB trigger, not a client mutation).
@@ -257,7 +265,7 @@ export default function ReservationDetailScreen() {
           <View style={styles.metaRow}>
             <Icon icon={MapPin} size="sm" color={colors.textSecondary} />
             <Text style={styles.metaText} numberOfLines={2}>
-              {r.charger_address}
+              {resolvedAddress.data ?? r.charger_address}
             </Text>
           </View>
           <View style={styles.metaRow}>

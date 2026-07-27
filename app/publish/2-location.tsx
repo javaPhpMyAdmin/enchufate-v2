@@ -44,12 +44,12 @@ import { Card } from '@/components/atoms/Card';
 import { Icon } from '@/components/atoms/Icon';
 import { Input } from '@/components/atoms/Input';
 import { PermissionToast } from '@/components/molecules/PermissionToast';
-import * as Location from 'expo-location';
 
 import {
   getCurrentPosition,
   requestLocationPermission,
 } from '@/lib/location';
+import { reverseGeocode } from '@/lib/geocode';
 import {
   usePublishStore,
   type PublishLocation,
@@ -57,30 +57,6 @@ import {
 import { colors, radius, spacing, typography } from '@/theme';
 
 type PermissionState = 'loading' | 'granted' | 'denied';
-
-/**
- * Reverse geocode lat/lng into a human-readable address using
- * expo-location. Falls back to raw coordinates when the API
- * returns nothing or errors.
- */
-async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  try {
-    const [result] = await Location.reverseGeocodeAsync({
-      latitude: lat,
-      longitude: lng,
-    });
-    if (!result) return coordsAsAddress(lat, lng);
-    const parts = [result.street, result.name, result.city, result.region].filter(Boolean);
-    return parts.join(', ') || coordsAsAddress(lat, lng);
-  } catch {
-    return coordsAsAddress(lat, lng);
-  }
-}
-
-/** Fallback: raw coordinates. */
-function coordsAsAddress(lat: number, lng: number): string {
-  return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-}
 
 export default function PublishStep2Location(): React.JSX.Element {
   const insets = useSafeAreaInsets();

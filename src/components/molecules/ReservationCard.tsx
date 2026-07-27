@@ -7,6 +7,7 @@ import { Button } from '@/components/atoms/Button';
 import { Card } from '@/components/atoms/Card';
 import { Icon } from '@/components/atoms/Icon';
 import { StatusPill, type StatusPillKind } from '@/components/atoms/StatusPill';
+import { useResolvedAddress } from '@/features/chargers/hooks/useResolvedAddress';
 import { colors, spacing, typography } from '@/theme';
 
 export type ReservationRole = 'renter' | 'host';
@@ -15,6 +16,10 @@ export interface ReservationCardProps {
   status: StatusPillKind;
   chargerTitle: string;
   address: string;
+  /** Charger latitude for reverse-geocoding coordinate addresses. */
+  lat?: number;
+  /** Charger longitude for reverse-geocoding coordinate addresses. */
+  lng?: number;
   timeBlock: string;
   powerKw?: number | null;
   otherPartyName: string;
@@ -36,6 +41,8 @@ export function ReservationCard({
   status,
   chargerTitle,
   address,
+  lat = 0,
+  lng = 0,
   timeBlock,
   powerKw,
   otherPartyName,
@@ -45,6 +52,8 @@ export function ReservationCard({
   onCancel,
   style,
 }: ReservationCardProps): React.JSX.Element {
+  const resolvedAddress = useResolvedAddress(address, lat, lng);
+  const displayAddress = resolvedAddress.data ?? address;
   // The cancel CTA only renders when the parent provides a
   // handler AND the reservation is still cancellable. The
   // inline check matches the `isCancellable` rule from
@@ -76,7 +85,7 @@ export function ReservationCard({
         <View style={styles.metaRow}>
           <Icon icon={MapPin} size="sm" color={colors.textSecondary} />
           <Text style={styles.metaText} numberOfLines={1}>
-            {address}
+            {displayAddress}
           </Text>
         </View>
         <View style={styles.metaRow}>

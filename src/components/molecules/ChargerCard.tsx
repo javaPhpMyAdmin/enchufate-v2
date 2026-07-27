@@ -6,6 +6,7 @@ import { Avatar } from '@/components/atoms/Avatar';
 import { Card } from '@/components/atoms/Card';
 import { Icon } from '@/components/atoms/Icon';
 import { StatusPill, type StatusPillKind } from '@/components/atoms/StatusPill';
+import { useResolvedAddress } from '@/features/chargers/hooks/useResolvedAddress';
 import { colors, spacing, typography } from '@/theme';
 
 export interface ChargerCardProps {
@@ -13,6 +14,10 @@ export interface ChargerCardProps {
   address: string;
   powerKw: number;
   status: StatusPillKind;
+  /** Charger latitude — used to reverse-geocode when `address` looks like coordinates. */
+  lat?: number;
+  /** Charger longitude — used to reverse-geocode when `address` looks like coordinates. */
+  lng?: number;
   /** Optional host display name; when set, the card shows the host's avatar. */
   hostName?: string;
   /** Optional host avatar URL. */
@@ -35,18 +40,26 @@ export interface ChargerCardProps {
  *
  * Composes `Card` + `Avatar` (host) + `StatusPill` + `Icon`. The
  * card is a `Pressable` when `onPress` is provided.
+ *
+ * When `lat`/`lng` are provided, the card auto-resolves coordinate
+ * addresses to human-readable form via reverse geocoding.
  */
 export function ChargerCard({
   title,
   address,
   powerKw,
   status,
+  lat = 0,
+  lng = 0,
   hostName,
   hostAvatarUri,
   onPress,
   footerAccessory,
   style,
 }: ChargerCardProps): React.JSX.Element {
+  const resolvedAddress = useResolvedAddress(address, lat, lng);
+  const displayAddress = resolvedAddress.data ?? address;
+
   return (
     <Card variant="default" padding="md" onPress={onPress} accessibilityLabel={title} style={style}>
       <View style={styles.header}>
@@ -58,7 +71,7 @@ export function ChargerCard({
           <View style={styles.row}>
             <Icon icon={MapPin} size="sm" color={colors.textSecondary} />
             <Text style={styles.address} numberOfLines={1}>
-              {address}
+              {displayAddress}
             </Text>
           </View>
         </View>

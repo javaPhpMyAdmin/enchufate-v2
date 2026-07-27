@@ -251,6 +251,8 @@ function AuthedState({
                 key={c.id}
                 title={c.title}
                 address={c.address}
+                lat={c.lat}
+                lng={c.lng}
                 powerKw={c.power_kw}
                 status={c.status === 'active' ? 'disponible' : 'paused'}
                 onPress={
@@ -262,9 +264,11 @@ function AuthedState({
                   <View style={styles.chargerActions}>
                     <Button
                       label={c.status === 'active' ? 'Pausar' : 'Reactivar'}
-                      variant={c.status === 'active' ? 'danger' : 'primary'}
+                      variant="ghost"
                       size="sm"
                       loading={toggleStatus.isPending}
+                      style={styles.pauseButton}
+                      labelStyle={c.status === 'active' ? styles.pauseButtonLabel : undefined}
                       onPress={async () => {
                         try {
                           await toggleStatus.toggle({ chargerId: c.id, currentStatus: c.status });
@@ -402,6 +406,18 @@ const styles = StyleSheet.create({
   emptyHint: { ...typography.body, color: colors.textSecondary, textAlign: 'center', paddingVertical: spacing.xl },
   chargerList: { gap: spacing.sm },
   chargerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  pauseButton: {
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.xs,
+    minWidth: 90,
+    borderRadius: 999,
+    backgroundColor: colors.warningSurface,
+  },
+  pauseButtonLabel: {
+    color: colors.warning,
+    fontWeight: '700',
+    fontSize: 12,
+  },
 
   signOutWrap: { marginTop: spacing.lg, paddingHorizontal: spacing.base },
 });
