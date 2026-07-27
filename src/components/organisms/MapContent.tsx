@@ -99,11 +99,11 @@ export default function MapContent({
                 circleRadius: [
                   'step',
                   ['get', 'point_count'],
-                  20,
+                  18,
                   5,
-                  26,
+                  24,
                   20,
-                  32,
+                  30,
                 ],
                 circleStrokeWidth: 3,
                 circleStrokeColor: colors.surface,
@@ -119,32 +119,14 @@ export default function MapContent({
                 textColor: colors.textOnPrimary,
               }}
             />
-            {/* Individual charger pin — 3-layer native marker (zoom >= 14). */}
-            <MapboxGL.CircleLayer
-              id="charger-pin-ring"
-              filter={['!', ['has', 'point_count']]}
-              style={{
-                circleColor: colors.surface,
-                circleRadius: 14,
-                circleStrokeWidth: 0,
-              }}
-            />
-            <MapboxGL.CircleLayer
-              id="charger-pin-dot"
-              filter={['!', ['has', 'point_count']]}
-              style={{
-                circleColor: colors.primary,
-                circleRadius: 11,
-                circleStrokeWidth: 2,
-                circleStrokeColor: colors.surface,
-              }}
-            />
+            {/* Individual charger pin (zoom >= 14). */}
             <MapboxGL.SymbolLayer
-              id="charger-pin-icon"
+              id="charger-pin"
               filter={['!', ['has', 'point_count']]}
               style={{
                 iconImage: CARGADOR_ICON_ID,
-                iconSize: 0.1,
+                iconSize: 0.12,
+                iconAnchor: 'bottom',
                 iconAllowOverlap: true,
               }}
             />
