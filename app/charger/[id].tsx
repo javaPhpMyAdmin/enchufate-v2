@@ -143,7 +143,8 @@ export default function ChargerDetailScreen() {
   const onShare = useCallback(async () => {
     const data = charger.data;
     if (!data) return;
-    const message = `Mirá este cargador en Enchúfate: ${data.title} — ${data.address}`;
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${data.lat},${data.lng}`;
+    const message = `🔌 Encontré un cargador en Enchúfate:\n\n${data.title}\n📍 ${data.address}\n⚡ ${data.power_kw} kW · ${CONNECTOR_LABEL[data.connector_type]}\n💰 $${data.price_per_hour_usd}/hora\n\n${mapsUrl}`;
     await Share.share({ message }, { dialogTitle: 'Compartir cargador' });
   }, [charger.data]);
 
