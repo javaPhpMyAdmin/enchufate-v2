@@ -63,6 +63,8 @@ import { ErrorState } from '@/components/molecules/ErrorState';
 import { Skeleton } from '@/components/molecules/Skeleton';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { useCharger } from '@/features/chargers/hooks/useCharger';
+import { useResolvedAddress } from '@/features/chargers/hooks/useResolvedAddress';
+import { isCoordinateAddress, reverseGeocode } from '@/lib/geocode';
 import { useToggleChargerStatus } from '@/features/chargers/hooks/useToggleChargerStatus';
 import { CONNECTOR_LABEL } from '@/features/chargers/types';
 import { useCreateReservation } from '@/features/reservations/hooks/useCreateReservation';
@@ -145,7 +147,10 @@ export default function ChargerDetailScreen() {
     if (!data) return;
     const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${data.lat},${data.lng}`;
     const priceDisplay = formatPrice(data.price_per_hour_usd, data.currency ?? 'USD');
-    const message = `🔌 Encontré un cargador en Enchúfate:\n\n${data.title}\n📍 ${data.address}\n⚡ ${data.power_kw} kW · ${CONNECTOR_LABEL[data.connector_type]}\n💰 ${priceDisplay}/hora\n\n${mapsUrl}`;
+    const shareAddr = isCoordinateAddress(data.address)
+      ? await reverseGeocode(data.lat, data.lng)
+      : data.address;
+    const message = `🔌 Encontré un cargador en Enchúfate:\n\n${data.title}\n📍 ${shareAddr}\n⚡ ${data.power_kw} kW · ${CONNECTOR_LABEL[data.connector_type]}\n💰 ${priceDisplay}/hora\n\n${mapsUrl}`;
     await Share.share({ message }, { dialogTitle: 'Compartir cargador' });
   }, [charger.data]);
 
@@ -225,6 +230,8 @@ export default function ChargerDetailScreen() {
   }
 
   const c = charger.data;
+  const resolvedAddress = useResolvedAddress(c.address, c.lat, c.lng);
+  const displayAddress = resolvedAddress.data ?? c.address;
   const photos = c.photos?.length > 0 ? c.photos : [null];
   const total = photos.length;
   const memberSince = new Intl.DateTimeFormat('es-UY', {
@@ -282,7 +289,7 @@ export default function ChargerDetailScreen() {
           </View>
           <View style={styles.metaRow}>
             <Icon icon={MapPin} size="md" color={colors.danger} />
-            <Text style={styles.metaText} numberOfLines={2}>{c.address}</Text>
+            <Text style={styles.metaText} numberOfLines={2}>{displayAddress}</Text>
           </View>
           <View style={styles.infoBadges}>
             <View style={styles.infoBadge}>
@@ -312,7 +319,7 @@ export default function ChargerDetailScreen() {
           </View>
           <View style={styles.directionsText}>
             <Text style={styles.directionsTitle}>Cómo llegar</Text>
-            <Text style={styles.directionsSub} numberOfLines={1}>{c.address}</Text>
+            <Text style={styles.directionsSub} numberOfLines={1}>{displayAddress}</Text>
           </View>
           <ChevronRight size={18} color={colors.textSecondary} />
         </Pressable>
