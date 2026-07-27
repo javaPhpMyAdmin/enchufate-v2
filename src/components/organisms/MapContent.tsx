@@ -135,20 +135,20 @@ export default function MapContent({
       </MapboxGL.MapView>
 
       {/* Filtros pill — top-left, above the safe area. */}
-      <View
-        pointerEvents="box-none"
-        style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}
+      <Pressable
+        onPress={onFilterPress}
+        style={({ pressed }) => [
+          styles.pill,
+          { position: 'absolute', top: insets.top + spacing.sm, left: spacing.lg },
+          pressed && styles.pillPressed,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel="Abrir filtros"
+        hitSlop={8}
       >
-        <Pressable
-          onPress={onFilterPress}
-          style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}
-          accessibilityRole="button"
-          accessibilityLabel="Abrir filtros"
-        >
-          <Icon icon={SlidersHorizontal} size="sm" color={colors.textOnPrimary} />
-          <Text style={styles.pillLabel}>Filtros</Text>
-        </Pressable>
-      </View>
+        <Icon icon={SlidersHorizontal} size="sm" color={colors.textOnPrimary} />
+        <Text style={styles.pillLabel}>Filtros</Text>
+      </Pressable>
 
       {/* Mapbox attribution (required by ToS). */}
       <View
