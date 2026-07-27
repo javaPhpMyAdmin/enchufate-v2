@@ -64,11 +64,17 @@ export default function PublishStep2Location(): React.JSX.Element {
   const location = usePublishStore((s) => s.location);
   const setLocation = usePublishStore((s) => s.setLocation);
 
-  const [permission, setPermission] = useState<PermissionState>('loading');
+  // If location is already populated (user went forward then back),
+  // skip the permission request and go straight to granted.
+  const hasLocation = location !== null && location.lat !== null && location.lng !== null;
+  const [permission, setPermission] = useState<PermissionState>(hasLocation ? 'granted' : 'loading');
   const [showDeniedToast, setShowDeniedToast] = useState(false);
 
   // ----- Permission + position on mount -----
   useEffect(() => {
+    // Skip if location is already populated from a previous visit
+    if (hasLocation) return;
+
     let mounted = true;
     void (async () => {
       const result = await requestLocationPermission();
