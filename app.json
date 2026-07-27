@@ -33,6 +33,7 @@
         "backgroundColor": "#FF6B1F"
       },
       "package": "com.enchufate.app",
+      "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",

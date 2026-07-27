@@ -25,6 +25,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -66,7 +67,20 @@ export default function ThreadScreen() {
   const { markAsRead } = useMarkAsRead(conversationId);
 
   const [text, setText] = useState('');
+  const [kbHeight, setKbHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+
+  // Android: track keyboard height so we can push the composer up
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const show = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKbHeight(e.endCoordinates.height);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => {
+      setKbHeight(0);
+    });
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   // Scroll to bottom when messages load or change.
   const scrollToBottom = useCallback(() => {
@@ -157,7 +171,7 @@ export default function ThreadScreen() {
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      keyboardVerticalOffset={0}
     >
       {/* Header — custom, not Stack.Screen, so we can render the avatar + status as one row */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
@@ -211,7 +225,11 @@ export default function ThreadScreen() {
       <View
         style={[
           styles.composer,
-          { paddingBottom: Math.max(insets.bottom, spacing.sm) + spacing.sm },
+          {
+            paddingBottom: Platform.OS === 'android'
+              ? kbHeight + spacing.sm
+              : Math.max(insets.bottom, spacing.sm) + spacing.sm,
+          },
         ]}
       >
         <TextInput
