@@ -32,6 +32,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -46,6 +47,7 @@ import {
   Map,
   MapPin,
   Navigation,
+  Share2,
   Star,
   Zap,
 } from 'lucide-react-native';
@@ -136,6 +138,13 @@ export default function ChargerDetailScreen() {
         directionsSheetRef.current?.present();
       });
     }
+  }, [charger.data]);
+
+  const onShare = useCallback(async () => {
+    const data = charger.data;
+    if (!data) return;
+    const message = `Mirá este cargador en Enchúfate: ${data.title} — ${data.address}`;
+    await Share.share({ message }, { dialogTitle: 'Compartir cargador' });
   }, [charger.data]);
 
   const [mapApps, setMapApps] = useState<
@@ -229,6 +238,9 @@ export default function ChargerDetailScreen() {
           <Icon icon={ChevronLeft} size="lg" color={colors.textPrimary} />
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>Cargador</Text>
+        <Pressable onPress={onShare} hitSlop={8} style={styles.shareButton}>
+          <Icon icon={Share2} size="md" color={colors.textSecondary} />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -554,6 +566,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   backButton: { padding: spacing.xs, marginLeft: -spacing.xs },
+  shareButton: { padding: spacing.xs, marginRight: -spacing.xs },
   headerTitle: { ...typography.heading, color: colors.textPrimary, flex: 1 },
 
   scroll: { padding: spacing.base, gap: spacing.base },
