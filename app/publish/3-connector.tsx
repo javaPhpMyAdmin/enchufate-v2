@@ -161,7 +161,7 @@ export default function PublishStep3Connector(): React.JSX.Element {
           </Text>
         </View>
 
-        {!validation.valid && (connector_type !== null || powerTouched) ? (
+        {!validation.valid && powerTouched ? (
           <View style={styles.hint}>
             {validation.errors.map((msg) => (
               <Text key={msg} style={styles.hintText}>
