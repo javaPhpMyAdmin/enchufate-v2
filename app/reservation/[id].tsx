@@ -30,6 +30,7 @@ import { useCallback, useState } from 'react';
 import {
   Alert,
   Linking,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -41,6 +42,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ArrowUpRight,
   Calendar,
+  CheckCircle2,
   ChevronLeft,
   MapPin,
   MessageCircle,
@@ -93,6 +95,7 @@ export default function ReservationDetailScreen() {
   // the Button's `loading` prop shows the spinner.
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [showConfirmSuccess, setShowConfirmSuccess] = useState(false);
 
   // Surface mutation errors via an Alert. The hook already
   // normalizes to AppError, so the `userMessage` is voseo + safe.
@@ -137,12 +140,11 @@ export default function ReservationDetailScreen() {
     if (!reservation.data) return;
     try {
       await confirm(reservation.data.id, reservation.data.status as ReservationStatus);
-      Alert.alert('Reserva confirmada', 'El huésped será notificado.');
-      router.back();
+      setShowConfirmSuccess(true);
     } catch {
       // Error surfaced via confirmError Alert above.
     }
-  }, [confirm, reservation.data, router]);
+  }, [confirm, reservation.data]);
 
   const onOpenInMaps = useCallback(() => {
     if (!reservation.data) return;
@@ -363,6 +365,28 @@ export default function ReservationDetailScreen() {
           editable={!isCancelling}
         />
       </ConfirmModal>
+
+      {/* ---- Success modal ---- */}
+      <Modal visible={showConfirmSuccess} transparent animationType="fade" onRequestClose={() => {}}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <CheckCircle2 size={64} color={colors.success} strokeWidth={2} />
+            <Text style={styles.modalTitle}>¡Reserva confirmada!</Text>
+            <Text style={styles.modalBody}>
+              El huésped será notificado de la confirmación.
+            </Text>
+            <Button
+              label="Continuar"
+              variant="primary"
+              fullWidth
+              onPress={() => {
+                setShowConfirmSuccess(false);
+                router.back();
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -432,5 +456,34 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     minHeight: 44,
     maxHeight: 100,
+  },
+
+  /* ---- Success modal ---- */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    padding: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.md,
+    width: '100%',
+    maxWidth: 360,
+  },
+  modalTitle: {
+    ...typography.heading,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  modalBody: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
   },
 });
