@@ -21,6 +21,7 @@
 export type ConnectorType = 'tipo_1' | 'tipo_2' | 'ccs' | 'chademo' | 'tesla';
 export type ChargerStatus = 'active' | 'paused';
 export type MinReservationMinutes = 30 | 60 | 120 | 240 | 480;
+export type Currency = 'USD' | 'UYU' | 'ARS';
 
 export type DayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
@@ -44,6 +45,7 @@ export interface Charger {
   connector_type: ConnectorType;
   power_kw: number;
   price_per_hour_usd: number;
+  currency: Currency;
   min_reservation_minutes: MinReservationMinutes;
   photos: string[];
   rules: string | null;

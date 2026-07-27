@@ -38,6 +38,7 @@ import { z } from 'zod';
 const CONNECTOR_VALUES = ['tipo_1', 'tipo_2', 'ccs', 'chademo', 'tesla'] as const;
 const STATUS_VALUES = ['active', 'paused'] as const;
 const MIN_RESERVATION_VALUES = [30, 60, 120, 240, 480] as const;
+const CURRENCY_VALUES = ['USD', 'UYU', 'ARS'] as const;
 
 /** 24h "HH:MM" — validated by the regex below. */
 const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -89,6 +90,7 @@ export const chargerSchema = z.object({
   price_per_hour_usd: z
     .number()
     .positive('El precio tiene que ser mayor a 0'),
+  currency: z.enum(CURRENCY_VALUES).default('USD'),
   min_reservation_minutes: z.union([
     z.literal(30),
     z.literal(60),
