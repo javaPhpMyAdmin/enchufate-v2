@@ -18,7 +18,7 @@ import { SlidersHorizontal } from 'lucide-react-native';
 import { FAB } from '@/components/atoms/FAB';
 import { Icon } from '@/components/atoms/Icon';
 import { URUGUAY_FALLBACK } from '@/lib/location';
-import { colors, radius, spacing, typography } from '@/theme';
+import { colors, radius, shadows, spacing, typography } from '@/theme';
 
 // ── Constants ────────────────────────────────────────────────
 const MAPBOX_STYLE = MapboxGL.StyleURL.Street;
@@ -99,11 +99,11 @@ export default function MapContent({
                 circleRadius: [
                   'step',
                   ['get', 'point_count'],
-                  18,
-                  5,
-                  24,
                   20,
-                  30,
+                  5,
+                  26,
+                  20,
+                  32,
                 ],
                 circleStrokeWidth: 3,
                 circleStrokeColor: colors.surface,
@@ -119,14 +119,32 @@ export default function MapContent({
                 textColor: colors.textOnPrimary,
               }}
             />
-            {/* Individual charger pin (zoom >= 14). */}
+            {/* Individual charger pin — 3-layer native marker (zoom >= 14). */}
+            <MapboxGL.CircleLayer
+              id="charger-pin-ring"
+              filter={['!', ['has', 'point_count']]}
+              style={{
+                circleColor: colors.surface,
+                circleRadius: 14,
+                circleStrokeWidth: 0,
+              }}
+            />
+            <MapboxGL.CircleLayer
+              id="charger-pin-dot"
+              filter={['!', ['has', 'point_count']]}
+              style={{
+                circleColor: colors.primary,
+                circleRadius: 11,
+                circleStrokeWidth: 2,
+                circleStrokeColor: colors.surface,
+              }}
+            />
             <MapboxGL.SymbolLayer
-              id="charger-pin"
+              id="charger-pin-icon"
               filter={['!', ['has', 'point_count']]}
               style={{
                 iconImage: CARGADOR_ICON_ID,
-                iconSize: 0.12,
-                iconAnchor: 'bottom',
+                iconSize: 0.1,
                 iconAllowOverlap: true,
               }}
             />
@@ -145,7 +163,7 @@ export default function MapContent({
           accessibilityRole="button"
           accessibilityLabel="Abrir filtros"
         >
-          <Icon icon={SlidersHorizontal} size="sm" color={colors.textPrimary} />
+          <Icon icon={SlidersHorizontal} size="sm" color={colors.textOnPrimary} />
           <Text style={styles.pillLabel}>Filtros</Text>
         </Pressable>
       </View>
@@ -180,6 +198,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
+    zIndex: 10,
   },
   pill: {
     flexDirection: 'row',
@@ -187,16 +206,19 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.primary,
     borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
+    elevation: 4,
+    shadowColor: colors.textPrimary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
     minHeight: 40,
   },
   pillPressed: { opacity: 0.85 },
   pillLabel: {
     ...typography.caption,
-    color: colors.textPrimary,
+    color: colors.textOnPrimary,
     fontWeight: '600',
   },
   attribution: {
