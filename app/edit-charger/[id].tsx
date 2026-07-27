@@ -53,7 +53,7 @@ import { useSession } from '@/features/auth/hooks/useSession';
 import { useCharger } from '@/features/chargers/hooks/useCharger';
 import { useUpdateCharger } from '@/features/chargers/hooks/useUpdateCharger';
 import { CONNECTOR_LABEL } from '@/features/chargers/types';
-import type { ConnectorType, DayKey, MinReservationMinutes } from '@/features/chargers/types';
+import type { ConnectorType, Currency, DayKey, MinReservationMinutes } from '@/features/chargers/types';
 import { isAppError } from '@/lib/error';
 import { compressImage } from '@/lib/imageUpload';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -74,6 +74,14 @@ const MIN_RESERVATION_LABELS: Record<MinReservationMinutes, string> = {
   120: '2 horas',
   240: '4 horas',
   480: '8 horas',
+};
+
+const CURRENCY_OPTIONS: Currency[] = ['USD', 'UYU', 'ARS'];
+
+const CURRENCY_ADORNMENT: Record<Currency, string> = {
+  USD: 'US$',
+  UYU: '$',
+  ARS: 'ARS $',
 };
 
 const DAY_KEYS: DayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -152,6 +160,7 @@ export default function EditChargerScreen(): React.JSX.Element {
   const [connectorType, setConnectorType] = useState<ConnectorType>('tipo_2');
   const [powerKw, setPowerKw] = useState('22');
   const [pricePerHour, setPricePerHour] = useState('1');
+  const [currency, setCurrency] = useState<Currency>('USD');
   const [minReservation, setMinReservation] = useState<MinReservationMinutes>(60);
   const [rules, setRules] = useState('');
   const [schedule, setSchedule] = useState<Record<DayKey, Array<{ from: string; to: string }>>>({
@@ -196,6 +205,7 @@ export default function EditChargerScreen(): React.JSX.Element {
     setConnectorType(c.connector_type);
     setPowerKw(String(c.power_kw));
     setPricePerHour(String(c.price_per_hour_usd));
+    setCurrency((c.currency as Currency) ?? 'USD');
     setMinReservation(c.min_reservation_minutes);
     setRules(c.rules ?? '');
     setSchedule(c.schedule as Record<DayKey, Array<{ from: string; to: string }>>);
@@ -321,6 +331,7 @@ export default function EditChargerScreen(): React.JSX.Element {
       connector_type: connectorType,
       power_kw: parseFloat(powerKw) || 0,
       price_per_hour_usd: parseFloat(pricePerHour) || 0,
+      currency,
       min_reservation_minutes: minReservation,
       rules: rules.trim().length === 0 ? null : rules.trim(),
       schedule,
@@ -346,7 +357,7 @@ export default function EditChargerScreen(): React.JSX.Element {
     }
   }, [
     chargerId, charger.data, title, description, address, connectorType,
-    powerKw, pricePerHour, minReservation, rules, schedule,
+    powerKw, pricePerHour, currency, minReservation, rules, schedule,
     photoState, updateCharger, router,
   ]);
 
@@ -579,13 +590,25 @@ export default function EditChargerScreen(): React.JSX.Element {
         {/* ---- Pricing ---- */}
         <Card variant="default" padding="md" style={styles.card}>
           <Text style={styles.sectionTitle}>Precio</Text>
+          <Text style={styles.fieldLabel}>Moneda</Text>
+          <View style={styles.chipRow}>
+            {CURRENCY_OPTIONS.map((cur) => (
+              <Chip
+                key={cur}
+                label={cur}
+                selected={currency === cur}
+                onPress={() => setCurrency(cur)}
+                size="sm"
+              />
+            ))}
+          </View>
           <Input
-            label="Precio por hora (USD)"
+            label="Precio por hora"
             value={pricePerHour}
             onChangeText={setPricePerHour}
             placeholder="0.00"
             keyboardType="decimal-pad"
-            leftAdornment={<Text style={styles.adornmentText}>$</Text>}
+            leftAdornment={<Text style={styles.adornmentText}>{CURRENCY_ADORNMENT[currency]}</Text>}
           />
           <Text style={styles.fieldLabel}>Tiempo mínimo de reserva</Text>
           <View style={styles.chipRow}>

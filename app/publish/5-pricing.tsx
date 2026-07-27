@@ -34,6 +34,7 @@ import {
   usePublishStore,
   validateStep5,
 } from '@/stores/publishStore';
+import type { Currency } from '@/features/chargers/types';
 import { colors, radius, spacing, typography } from '@/theme';
 
 interface DurationOption {
@@ -42,6 +43,25 @@ interface DurationOption {
   /** User-facing label (Rioplatense, matches the V1 chip wording). */
   label: string;
 }
+
+interface CurrencyOption {
+  value: Currency;
+  label: string;
+}
+
+/** The 3 currency options — order is the visual order on the screen. */
+const CURRENCIES: readonly CurrencyOption[] = [
+  { value: 'USD', label: 'USD' },
+  { value: 'UYU', label: 'UYU' },
+  { value: 'ARS', label: 'ARS' },
+] as const;
+
+/** Left adornment text for each currency in the price input. */
+const CURRENCY_ADORNMENT: Record<Currency, string> = {
+  USD: 'US$',
+  UYU: '$',
+  ARS: 'ARS $',
+};
 
 /** The 5 reservation-duration options — order is the visual order on the screen. */
 const DURATIONS: readonly DurationOption[] = [
@@ -73,6 +93,7 @@ export default function PublishStep5Pricing(): React.JSX.Element {
 
   const pricing = usePublishStore((s) => s.pricing);
   const setPricePerHour = usePublishStore((s) => s.setPricePerHour);
+  const setCurrency = usePublishStore((s) => s.setCurrency);
   const setMinReservation = usePublishStore((s) => s.setMinReservation);
 
   const onChangePrice = useCallback(
@@ -106,18 +127,36 @@ export default function PublishStep5Pricing(): React.JSX.Element {
         <View style={styles.header}>
           <Text style={styles.title}>¿Cuánto cuesta cargar una hora en tu cargador?</Text>
           <Text style={styles.subtitle}>
-            Definí el precio por hora en dólares. Los huéspedes lo ven antes de reservar.
+            Elegí la moneda y definí el precio por hora. Los huéspedes lo ven antes de reservar.
           </Text>
         </View>
 
         <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Moneda</Text>
+          <View style={styles.chipGroup}>
+            {CURRENCIES.map((cur) => {
+              const selected = pricing.currency === cur.value;
+              return (
+                <Chip
+                  key={cur.value}
+                  label={cur.label}
+                  selected={selected}
+                  onPress={() => setCurrency(cur.value)}
+                  style={styles.chip}
+                />
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.field}>
           <Input
-            label="Precio por hora (USD)"
+            label="Precio por hora"
             value={formatPriceInput(pricing.price_per_hour_usd)}
             onChangeText={onChangePrice}
             placeholder="0.50"
             keyboardType="decimal-pad"
-            leftAdornment={<Text style={styles.leftAdornment}>USD</Text>}
+            leftAdornment={<Text style={styles.leftAdornment}>{CURRENCY_ADORNMENT[pricing.currency]}</Text>}
             rightAdornment={<Text style={styles.adornment}>/ hora</Text>}
           />
           <Text style={styles.helper}>
@@ -171,6 +210,11 @@ const styles = StyleSheet.create({
   title: { ...typography.title, color: colors.textPrimary },
   subtitle: { ...typography.body, color: colors.textSecondary },
   field: { gap: spacing.xs },
+  fieldLabel: {
+    ...typography.caption,
+    color: colors.textPrimary,
+    fontWeight: '600',
+  },
   helper: {
     ...typography.caption,
     color: colors.textSecondary,
