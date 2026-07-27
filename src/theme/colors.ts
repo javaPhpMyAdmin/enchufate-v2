@@ -28,6 +28,9 @@ export const colors = {
   background: '#FAFAFA',
   border: '#E5E7EB',
 
+  // Chat
+  bubbleIncoming: '#E8EDF5',
+
   // Info banner (BetaBanner)
   infoBg: '#DBEAFE',
   infoText: '#1E3A8A',

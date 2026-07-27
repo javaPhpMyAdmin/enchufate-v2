@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   rowSystem: { justifyContent: 'flex-start' },
   bubble: { maxWidth: '78%', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.card },
   bubbleUser: { backgroundColor: colors.primary, borderBottomRightRadius: spacing.xs },
-  bubbleSystem: { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: spacing.xs },
+  bubbleSystem: { backgroundColor: colors.bubbleIncoming, borderBottomLeftRadius: spacing.xs },
   bodyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   body: { ...typography.body, flexShrink: 1 },
   bodyUser: { color: colors.textOnPrimary },
