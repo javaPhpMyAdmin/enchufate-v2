@@ -1,9 +1,9 @@
 /**
- * FiltersSheet — bottom sheet with 5 chip-group sections.
+ * FiltersModal — filter panel rendered as a native RN Modal.
  *
- * Wraps `@gorhom/bottom-sheet`'s `BottomSheetModal` with the
- * Filtros content. Each section is a `FilterChipRow` (mutually
- * exclusive options) bound to one category of the `useFilterStore`.
+ * Replaced BottomSheetModal because it conflicts with Mapbox
+ * gesture handling on Android. A plain Modal avoids all gesture
+ * conflicts and is simpler to maintain.
  *
  * State model:
  *   - The user edits selections in the store's `draft` (an isolated
@@ -11,24 +11,22 @@
  *     value)`.
  *   - The Reset button clears both `draft` and `filters`.
  *   - The Aplicar button commits `draft` into `filters` (the value
- *     the map query reads) and closes the sheet.
- *
- * Why draft + apply: the spec wants the map to update ONLY when the
- * user explicitly confirms (Aplicar). Tapping a chip inside the
- * sheet should not refilter the map mid-edit.
+ *     the map query reads) and closes the modal.
  */
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect } from 'react';
 import {
-  BottomSheetModal,
-  BottomSheetScrollView,
-  BottomSheetBackdrop,
-  type BottomSheetBackdropProps,
-} from '@gorhom/bottom-sheet';
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { Button } from '@/components/atoms/Button';
 import { FilterChipRow, type FilterChipRowOption } from '@/components/molecules/FilterChipRow';
 import { useFilterStore, type FilterCategory, type FilterValue } from '@/stores/filterStore';
+import { isFeatureEnabled } from '@/lib/features';
 import { colors, spacing, typography } from '@/theme';
 
 export interface FiltersSheetProps {
@@ -36,10 +34,8 @@ export interface FiltersSheetProps {
   onClose: () => void;
 }
 
-const SNAP_POINTS = ['25%', '50%', '90%'];
-
 const ESTADO_OPTIONS: ReadonlyArray<FilterChipRowOption> = [
-  { label: 'Todos', value: '__none__' },
+  { label: 'Activos', value: '__none__' },
   { label: 'Disponible', value: 'disponible' },
   { label: 'Pausado', value: 'pausado' },
 ];
@@ -61,13 +57,6 @@ const POTENCIA_OPTIONS: ReadonlyArray<FilterChipRowOption> = [
   { label: 'Ultra (>50 kW)', value: 'ultra' },
 ];
 
-const PRECIO_OPTIONS: ReadonlyArray<FilterChipRowOption> = [
-  { label: 'Todos', value: '__none__' },
-  { label: 'Económico', value: 'economico' },
-  { label: 'Estándar', value: 'estandar' },
-  { label: 'Premium', value: 'premium' },
-];
-
 const DISTANCIA_OPTIONS: ReadonlyArray<FilterChipRowOption> = [
   { label: 'Todos', value: '__none__' },
   { label: 'Cerca (<2 km)', value: 'cerca' },
@@ -75,9 +64,15 @@ const DISTANCIA_OPTIONS: ReadonlyArray<FilterChipRowOption> = [
   { label: 'Lejos (>10 km)', value: 'lejos' },
 ];
 
+const FUENTE_OPTIONS: ReadonlyArray<FilterChipRowOption> = [
+  { label: 'Todos', value: '__none__' },
+  { label: 'Enchúfate', value: 'enchufate' },
+  { label: 'UTE', value: 'ute' },
+];
+
 const NONE_SENTINEL = '__none__';
 
-const SECTIONS: ReadonlyArray<{
+const BASE_SECTIONS: ReadonlyArray<{
   category: FilterCategory;
   label: string;
   options: ReadonlyArray<FilterChipRowOption>;
@@ -85,9 +80,14 @@ const SECTIONS: ReadonlyArray<{
   { category: 'estado', label: 'Estado', options: ESTADO_OPTIONS },
   { category: 'conector', label: 'Conector', options: CONECTOR_OPTIONS },
   { category: 'potencia', label: 'Potencia', options: POTENCIA_OPTIONS },
-  { category: 'precio', label: 'Precio', options: PRECIO_OPTIONS },
-  { category: 'distancia', label: 'Distancia', options: DISTANCIA_OPTIONS },
+  { category: 'distancia', label: 'Distancia (en línea recta)', options: DISTANCIA_OPTIONS },
 ];
+
+const FUENTE_SECTION = {
+  category: 'fuente' as FilterCategory,
+  label: 'Fuente',
+  options: FUENTE_OPTIONS,
+};
 
 function valueToChip(
   current: string | number | null,
@@ -106,28 +106,16 @@ function chipToValue(
 }
 
 export function FiltersSheet({ visible, onClose }: FiltersSheetProps): React.JSX.Element {
-  const sheetRef = useRef<BottomSheetModal>(null);
   const filters = useFilterStore((s) => s.filters);
   const draft = useFilterStore((s) => s.draft);
   const setDraft = useFilterStore((s) => s.setDraft);
   const applyDraft = useFilterStore((s) => s.applyDraft);
   const resetFilters = useFilterStore((s) => s.resetFilters);
 
-  // Sync the store's `draft` with the applied `filters` every time
-  // the sheet opens — otherwise a stale draft from a previous open
-  // would override the current applied state.
+  // Seed the draft with current applied filters every time the modal opens.
   useEffect(() => {
     if (visible) {
-      // The store has no "setDraft to filters" action; the cleanest
-      // way to seed the draft is to call applyDraft (commit current
-      // draft into filters) IF draft is already a copy of filters.
-      // When the user opens the sheet fresh, draft should equal
-      // filters (the store initializes both as EMPTY). We
-      // re-initialize by reading filters explicitly here:
       useFilterStore.setState({ draft: { ...filters } });
-      sheetRef.current?.present();
-    } else {
-      sheetRef.current?.dismiss();
     }
   }, [visible, filters]);
 
@@ -140,63 +128,103 @@ export function FiltersSheet({ visible, onClose }: FiltersSheetProps): React.JSX
     resetFilters();
   }, [resetFilters]);
 
-  const renderBackdrop = useCallback(
-    (props: BottomSheetBackdropProps) => (
-      <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} pressBehavior="close" />
-    ),
-    [],
-  );
-
   const currentDraft = draft;
 
+  // Conditionally include Fuente section when PUBLIC_CHARGERS is enabled.
+  const sections = isFeatureEnabled('PUBLIC_CHARGERS')
+    ? [FUENTE_SECTION, ...BASE_SECTIONS]
+    : [...BASE_SECTIONS];
+
   return (
-    <BottomSheetModal
-      ref={sheetRef}
-      index={1}
-      snapPoints={useMemo(() => SNAP_POINTS, [])}
-      enableDynamicSizing={false}
-      backdropComponent={renderBackdrop}
-      onDismiss={onClose}
-      handleIndicatorStyle={styles.handle}
-      backgroundStyle={styles.background}
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
     >
-      <BottomSheetScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Filtros</Text>
+      {/* Backdrop — tap to close */}
+      <Pressable style={styles.backdrop} onPress={onClose} />
 
-        {SECTIONS.map((section) => (
-          <FilterChipRow
-            key={section.category}
-            label={section.label}
-            options={section.options}
-            value={valueToChip(currentDraft[section.category], section.options)}
-            onChange={(v) =>
-              setDraft(section.category, chipToValue(v, section.category))
-            }
-          />
-        ))}
-
-        <View style={styles.actions}>
-          <Pressable
-            onPress={handleReset}
-            accessibilityRole="button"
-            accessibilityLabel="Restablecer filtros"
-            hitSlop={8}
-            style={({ pressed }) => [styles.reset, pressed && styles.actionPressed]}
-          >
-            <Text style={styles.resetLabel}>Reset</Text>
-          </Pressable>
-          <Button label="Aplicar" onPress={handleApply} variant="primary" size="md" />
+      {/* Sheet panel */}
+      <View style={styles.sheet}>
+        {/* Drag indicator */}
+        <View style={styles.handleContainer}>
+          <View style={styles.handle} />
         </View>
-      </BottomSheetScrollView>
-    </BottomSheetModal>
+
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.title}>Filtros</Text>
+
+          {sections.map((section) => (
+            <FilterChipRow
+              key={section.category}
+              label={section.label}
+              options={section.options}
+              value={valueToChip(currentDraft[section.category], section.options)}
+              onChange={(v) =>
+                setDraft(section.category, chipToValue(v, section.category))
+              }
+            />
+          ))}
+
+          <View style={styles.actions}>
+            <Pressable
+              onPress={handleReset}
+              accessibilityRole="button"
+              accessibilityLabel="Restablecer filtros"
+              hitSlop={8}
+              style={({ pressed }) => [styles.reset, pressed && styles.actionPressed]}
+            >
+              <Text style={styles.resetLabel}>Reset</Text>
+            </Pressable>
+            <Button label="Aplicar" onPress={handleApply} variant="primary" size="md" />
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  background: { backgroundColor: colors.surface },
-  handle: { backgroundColor: colors.border, width: 40 },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg },
-  title: { ...typography.title, color: colors.textPrimary, marginBottom: spacing.sm },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  sheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    maxHeight: '85%',
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  handleContainer: {
+    alignItems: 'center',
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
+  handle: {
+    width: 40,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: colors.border,
+  },
+  content: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: spacing.lg,
+  },
+  title: {
+    ...typography.title,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -206,7 +234,14 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  reset: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
+  reset: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
   actionPressed: { opacity: 0.7 },
-  resetLabel: { ...typography.body, color: colors.textPrimary, fontWeight: '600' },
+  resetLabel: {
+    ...typography.body,
+    color: colors.textPrimary,
+    fontWeight: '600',
+  },
 });
