@@ -248,19 +248,53 @@ export default function MapContent({
                 textColor: colors.textOnPrimary,
               }}
             />
-            {/* Individual P2P charger pin (zoom >= 14, source=enchufate). */}
+            {/* Individual P2P charger pin (zoom >= 14, source=enchufate).
+                Excludes chargers with an active charging session —
+                those get their own orange layer below. */}
             <MapboxGL.SymbolLayer
               id="charger-pin"
               filter={[
                 'all',
                 ['!', ['has', 'point_count']],
                 ['==', 'source', 'enchufate'],
+                ['!', ['has', 'current_charging_since']],
               ]}
               style={{
                 iconImage: CARGADOR_ICON_ID,
                 iconSize: 0.16,
                 iconAnchor: 'bottom',
                 iconAllowOverlap: true,
+              }}
+            />
+            {/* Orange charging pin (source=enchufate, actively charging).
+                Orange circle + lightning bolt overlaid. */}
+            <MapboxGL.CircleLayer
+              id="charger-pin-charging-bg"
+              filter={[
+                'all',
+                ['!', ['has', 'point_count']],
+                ['==', 'source', 'enchufate'],
+                ['has', 'current_charging_since'],
+              ]}
+              style={{
+                circleColor: colors.charging,
+                circleRadius: 16,
+                circleStrokeWidth: 2,
+                circleStrokeColor: colors.surface,
+              }}
+            />
+            <MapboxGL.SymbolLayer
+              id="charger-pin-charging"
+              filter={[
+                'all',
+                ['!', ['has', 'point_count']],
+                ['==', 'source', 'enchufate'],
+                ['has', 'current_charging_since'],
+              ]}
+              style={{
+                textField: '⚡',
+                textSize: 16,
+                textAllowOverlap: true,
               }}
             />
             {/* Individual UTE charger pin — blue circle + "UTE" text (source=ute). */}
