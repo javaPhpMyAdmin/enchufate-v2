@@ -30,9 +30,10 @@ import {
   type ConnectorType,
   type Currency,
 } from '@/features/chargers/types';
-import { URUGUAY_FALLBACK } from '@/lib/location';
-import { getCurrentPosition } from '@/lib/location';
+import { useChargingTimer } from '@/hooks/useChargingTimer';
+import { isFeatureEnabled } from '@/lib/features';
 import { formatPrice } from '@/lib/format';
+import { getCurrentPosition, URUGUAY_FALLBACK } from '@/lib/location';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
 
 export interface ChargerPopupProps {
@@ -49,6 +50,8 @@ export interface ChargerPopupProps {
   position?: { x: number; y: number } | null;
   routeDistanceMeters?: number | null;
   stationStatus?: 'operational' | 'limited' | 'offline';
+  /** ISO 8601 — active charging session start (P2P only). */
+  charging_since?: string;
   onPressDetail: () => void;
   onDismiss: () => void;
 }
@@ -91,6 +94,7 @@ export function ChargerPopup({
   lng,
   position,
   routeDistanceMeters,
+  charging_since,
   onPressDetail,
   onDismiss,
 }: ChargerPopupProps) {
@@ -126,6 +130,9 @@ export function ChargerPopup({
 
   const displayDistance = routeDistanceMeters ?? fallbackDistance;
   const showLoading = loadingFallback && displayDistance == null;
+  const { elapsed } = useChargingTimer(
+    isFeatureEnabled('CHARGING_STATUS') ? charging_since : null,
+  );
 
   // ── Position card above the marker (no backdrop — map stays interactable) ──
   const hasCoords = position != null;
@@ -231,6 +238,9 @@ export function ChargerPopup({
       ) : (
         /* ── P2P (enchufate) single connector ─────────── */
         <>
+          {elapsed ? (
+            <Text style={styles.chargingTimer}>⚡ Cargando hace {elapsed}</Text>
+          ) : null}
           <View style={styles.infoRow}>
             <Text style={styles.info}>
               {CONNECTOR_LABEL[connectorType]} · {powerKw} kW
@@ -265,6 +275,11 @@ export function ChargerPopup({
 }
 
 const styles = StyleSheet.create({
+  chargingTimer: {
+    ...typography.caption,
+    color: colors.charging,
+    fontWeight: '700',
+  },
   card: {
     position: 'absolute',
     width: CARD_WIDTH,

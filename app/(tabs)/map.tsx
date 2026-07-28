@@ -90,6 +90,8 @@ interface SelectedCharger {
   lat: number;
   lng: number;
   stationStatus?: 'operational' | 'limited' | 'offline';
+  /** ISO 8601 — set when this P2P charger has an active charging session. */
+  current_charging_since?: string;
 }
 
 // ── GeoJSON helpers (no MapLibre dependency) ─────────────────
@@ -117,6 +119,7 @@ function chargersToGeoJSON(
           lat: c.lat,
           lng: c.lng,
           station_status: c.station_status,
+          current_charging_since: c.current_charging_since,
         },
       }),
     ),
@@ -294,6 +297,7 @@ export default function MapTab() {
       lat?: number;
       lng?: number;
       station_status?: 'operational' | 'limited' | 'offline';
+      current_charging_since?: string;
     };
     if (
       props.cluster &&
@@ -328,6 +332,7 @@ export default function MapTab() {
         lat: props.lat,
         lng: props.lng,
         stationStatus: props.station_status,
+        current_charging_since: props.current_charging_since,
       });
     }
   }, []);
@@ -394,6 +399,7 @@ export default function MapTab() {
           position={markerScreenCoords}
           routeDistanceMeters={routeDistanceMeters}
           stationStatus={selectedCharger.stationStatus}
+          charging_since={selectedCharger.current_charging_since}
           onPressDetail={() => {
             const id = selectedCharger.id;
             setSelectedCharger(null);
