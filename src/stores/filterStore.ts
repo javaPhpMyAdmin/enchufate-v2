@@ -18,37 +18,37 @@ import { create } from 'zustand';
 export type EstadoFilter = 'disponible' | 'pausado';
 export type ConectorFilter = 'tipo_1' | 'tipo_2' | 'ccs' | 'chademo' | 'tesla';
 export type PotenciaFilter = 'lenta' | 'semi_rapida' | 'rapida' | 'ultra';
-export type PrecioFilter = 'economico' | 'estandar' | 'premium';
 export type DistanciaFilter = 'cerca' | 'medio' | 'lejos';
+export type SourceFilter = 'enchufate' | 'ute';
 
 export type FilterCategory =
   | 'estado'
   | 'conector'
   | 'potencia'
-  | 'precio'
-  | 'distancia';
+  | 'distancia'
+  | 'fuente';
 
 export type FilterValue =
   | EstadoFilter
   | ConectorFilter
   | PotenciaFilter
-  | PrecioFilter
-  | DistanciaFilter;
+  | DistanciaFilter
+  | SourceFilter;
 
 export interface MapFilters {
   estado: EstadoFilter | null;
   conector: ConectorFilter | null;
   potencia: PotenciaFilter | null;
-  precio: PrecioFilter | null;
   distancia: DistanciaFilter | null;
+  fuente: SourceFilter | null;
 }
 
 const EMPTY: MapFilters = {
   estado: null,
   conector: null,
   potencia: null,
-  precio: null,
   distancia: null,
+  fuente: null,
 };
 
 export interface FilterStore {
@@ -91,7 +91,7 @@ export function hasActiveFilters(filters: MapFilters): boolean {
     filters.estado !== null ||
     filters.conector !== null ||
     filters.potencia !== null ||
-    filters.precio !== null ||
-    filters.distancia !== null
+    filters.distancia !== null ||
+    filters.fuente !== null
   );
 }
