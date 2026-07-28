@@ -1,0 +1,7 @@
+{
+  "name": "charging-timeout",
+  "schedule": "every 5 minutes",
+  "headers": {
+    "authorization": "Bearer {{ .SUPABASE_SERVICE_ROLE_KEY }}"
+  }
+}
