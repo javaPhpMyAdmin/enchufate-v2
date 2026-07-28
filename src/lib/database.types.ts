@@ -21,6 +21,7 @@ export type Database = {
           connector_type: Database["public"]["Enums"]["connector_type"]
           created_at: string
           currency: string
+          current_charging_since: string | null
           description: string
           id: string
           lat: number
@@ -43,6 +44,7 @@ export type Database = {
           connector_type: Database["public"]["Enums"]["connector_type"]
           created_at?: string
           currency?: string
+          current_charging_since?: string | null
           description: string
           id?: string
           lat: number
@@ -65,6 +67,7 @@ export type Database = {
           connector_type?: Database["public"]["Enums"]["connector_type"]
           created_at?: string
           currency?: string
+          current_charging_since?: string | null
           description?: string
           id?: string
           lat?: number
@@ -301,6 +304,7 @@ export type Database = {
           cancel_reason: string | null
           cancelled_by: string | null
           charger_id: string
+          charging_started_at: string | null
           created_at: string
           end_at: string | null
           horario_a_coordinar: string | null
@@ -314,6 +318,7 @@ export type Database = {
           cancel_reason?: string | null
           cancelled_by?: string | null
           charger_id: string
+          charging_started_at?: string | null
           created_at?: string
           end_at?: string | null
           horario_a_coordinar?: string | null
@@ -327,6 +332,7 @@ export type Database = {
           cancel_reason?: string | null
           cancelled_by?: string | null
           charger_id?: string
+          charging_started_at?: string | null
           created_at?: string
           end_at?: string | null
           horario_a_coordinar?: string | null
@@ -437,9 +443,11 @@ export type Database = {
         | "system_reservation_requested"
         | "system_reservation_confirmed"
         | "system_reservation_cancelled"
+        | "system_charging_started"
       reservation_status:
         | "solicitada"
         | "confirmada"
+        | "en_curso"
         | "cancelada"
         | "completada"
     }
@@ -576,10 +584,12 @@ export const Constants = {
         "system_reservation_requested",
         "system_reservation_confirmed",
         "system_reservation_cancelled",
+        "system_charging_started",
       ],
       reservation_status: [
         "solicitada",
         "confirmada",
+        "en_curso",
         "cancelada",
         "completada",
       ],
