@@ -61,7 +61,10 @@ import { LoadingState } from '@/components/molecules/LoadingState';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { useCancelReservation } from '@/features/reservations/hooks/useCancelReservation';
 import { useConfirmReservation } from '@/features/reservations/hooks/useConfirmReservation';
+import { useEndCharging } from '@/features/reservations/mutations/endCharging';
+import { useStartCharging } from '@/features/reservations/mutations/startCharging';
 import { useReservation } from '@/features/reservations/hooks/useReservation';
+import { useChargingTimer } from '@/hooks/useChargingTimer';
 import { useNotifyCompletion } from '@/features/reservations/hooks/useNotifyCompletion';
 import { useReviewEligibility } from '@/features/reviews/hooks/useReviewEligibility';
 import { useResolvedAddress } from '@/features/chargers/hooks/useResolvedAddress';
@@ -85,6 +88,8 @@ export default function ReservationDetailScreen() {
   const reservation = useReservation(reservationId);
   const { cancel, isPending: isCancelling, error: cancelError } = useCancelReservation();
   const { confirm, isPending: isConfirming, error: confirmError } = useConfirmReservation();
+  const { startCharging, isPending: isStartingCharging, error: startChargingError } = useStartCharging();
+  const { endCharging, isPending: isEndingCharging, error: endChargingError } = useEndCharging();
   const reviewEligibility = useReviewEligibility(reservationId);
 
   // Resolve coordinate addresses to human-readable form
@@ -105,6 +110,16 @@ export default function ReservationDetailScreen() {
   const [cancelReason, setCancelReason] = useState('');
   const [showConfirmSuccess, setShowConfirmSuccess] = useState(false);
 
+  // Timer for active charging session.
+  const { elapsed } = useChargingTimer(
+    isFeatureEnabled('CHARGING_STATUS') &&
+    reservation.data?.status === 'en_curso'
+      ? reservation.data.charging_started_at
+      : null,
+  );
+
+  const [endChargingModalVisible, setEndChargingModalVisible] = useState(false);
+
   // Surface mutation errors via an Alert. The hook already
   // normalizes to AppError, so the `userMessage` is voseo + safe.
   if (cancelError && !cancelModalVisible) {
@@ -112,6 +127,12 @@ export default function ReservationDetailScreen() {
   }
   if (confirmError) {
     Alert.alert('No pudimos confirmar la reserva', confirmError.userMessage);
+  }
+  if (startChargingError && !endChargingModalVisible) {
+    Alert.alert('No pudimos iniciar la carga', startChargingError.userMessage);
+  }
+  if (endChargingError && !endChargingModalVisible) {
+    Alert.alert('No pudimos finalizar la carga', endChargingError.userMessage);
   }
 
   const onCancelPress = useCallback(() => {
@@ -153,6 +174,35 @@ export default function ReservationDetailScreen() {
       // Error surfaced via confirmError Alert above.
     }
   }, [confirm, reservation.data]);
+
+  const onStartChargingPress = useCallback(async () => {
+    if (!reservation.data) return;
+    try {
+      await startCharging(reservation.data.id, reservation.data.status as ReservationStatus);
+    } catch {
+      // Error surfaced via startChargingError Alert.
+    }
+  }, [startCharging, reservation.data]);
+
+  const onEndChargingPress = useCallback(() => {
+    setEndChargingModalVisible(true);
+  }, []);
+
+  const onEndChargingConfirm = useCallback(async () => {
+    if (!reservation.data) return;
+    try {
+      await endCharging(reservation.data.id, reservation.data.status as ReservationStatus);
+      setEndChargingModalVisible(false);
+      router.back();
+    } catch {
+      // Error surfaced via endChargingError Alert.
+    }
+  }, [endCharging, reservation.data, router]);
+
+  const onEndChargingClose = useCallback(() => {
+    if (isEndingCharging) return;
+    setEndChargingModalVisible(false);
+  }, [isEndingCharging]);
 
   const onOpenInMaps = useCallback(() => {
     if (!reservation.data) return;
@@ -317,6 +367,39 @@ export default function ReservationDetailScreen() {
             leftIcon={<Icon icon={MessageCircle} size="md" color={colors.textOnPrimary} />}
             onPress={onChat}
           />
+          {/* Charging status: gated behind CHARGING_STATUS flag */}
+          {isFeatureEnabled('CHARGING_STATUS') ? (
+            <>
+              {/* Active charging timer — visible when charging is in progress. */}
+              {r.status === 'en_curso' && elapsed ? (
+                <View style={styles.chargingTimerRow}>
+                  <Text style={styles.chargingTimerText}>
+                    ⚡ Cargando hace {elapsed}
+                  </Text>
+                </View>
+              ) : null}
+              {/* Start charging: host only, when status is 'confirmada'. */}
+              {userId === r.host_id && r.status === 'confirmada' ? (
+                <Button
+                  label={isStartingCharging ? 'Iniciando...' : 'Iniciar carga'}
+                  variant="primary"
+                  fullWidth
+                  onPress={onStartChargingPress}
+                  disabled={isStartingCharging}
+                />
+              ) : null}
+              {/* End charging: both parties, when status is 'en_curso'. */}
+              {r.status === 'en_curso' ? (
+                <Button
+                  label={isEndingCharging ? 'Finalizando...' : 'Finalizar carga'}
+                  variant="danger"
+                  fullWidth
+                  onPress={onEndChargingPress}
+                  disabled={isEndingCharging}
+                />
+              ) : null}
+            </>
+          ) : null}
           {/* Confirm: visible only for the host when status is 'solicitada' */}
           {userId === r.host_id && r.status === 'solicitada' ? (
             <Button
@@ -373,6 +456,21 @@ export default function ReservationDetailScreen() {
           editable={!isCancelling}
         />
       </ConfirmModal>
+
+      {/* End-charging confirmation — gated behind CHARGING_STATUS flag */}
+      {isFeatureEnabled('CHARGING_STATUS') ? (
+        <ConfirmModal
+          visible={endChargingModalVisible}
+          onClose={onEndChargingClose}
+          onConfirm={onEndChargingConfirm}
+          title={`¿Finalizar la carga de ${r.charger_title}?`}
+          body="Confirmá que ya terminaste de cargar. Esta acción no se puede deshacer."
+          confirmLabel="Finalizar carga"
+          cancelLabel="Volver"
+          variant="danger"
+          loading={isEndingCharging}
+        />
+      ) : null}
 
       {/* ---- Success modal ---- */}
       <Modal visible={showConfirmSuccess} transparent animationType="fade" onRequestClose={() => {}}>
@@ -453,6 +551,17 @@ const styles = StyleSheet.create({
 
   actions: { gap: spacing.sm, marginTop: spacing.md },
   cancelButton: {},
+  chargingTimerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+  },
+  chargingTimerText: {
+    ...typography.heading,
+    color: colors.charging,
+    fontWeight: '800',
+  },
   reasonInput: {
     ...typography.body,
     color: colors.textPrimary,
