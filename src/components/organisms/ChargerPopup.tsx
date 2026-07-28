@@ -162,7 +162,7 @@ export function ChargerPopup({
         <Text style={styles.title} numberOfLines={1}>
           {title}
         </Text>
-        {/* {source === 'ocm' && (
+        {source === 'ocm' && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>OCM</Text>
           </View>
@@ -171,7 +171,7 @@ export function ChargerPopup({
           <View style={styles.badge}>
             <Text style={styles.badgeText}>UTE</Text>
           </View>
-        )} */}
+        )}
         <Pressable
           onPress={onDismiss}
           style={styles.closeButton}

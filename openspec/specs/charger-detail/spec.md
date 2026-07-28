@@ -1,4 +1,4 @@
-<!-- Merged from mvp-bootstrap change on 2026-07-19 -->
+<!-- Merged from mvp-bootstrap change on 2026-07-19; updated by edit-charger change on 2026-07-28 -->
 # Charger Detail Specification
 
 ## Purpose
@@ -75,6 +75,22 @@ The system SHALL display a sticky "Reservar" button at the bottom of the screen.
 - WHEN the user taps "Reservar"
 - THEN the reservation request sheet opens
 - AND the user can pick a date + time or choose "Lo antes posible"
+
+### Requirement: Owner Edit CTA
+
+The system SHALL display an "Editar" button on the charger detail screen when the logged-in user is the charger owner. The button navigates to `/edit-charger/{id}`. Non-owners MUST NOT see this button.
+
+#### Scenario: Owner sees Editar button
+
+- GIVEN the logged-in user owns the charger
+- WHEN the charger detail screen renders
+- THEN an "Editar" button is visible and navigates to the edit screen on tap
+
+#### Scenario: Non-owner does not see Editar
+
+- GIVEN the logged-in user does not own the charger
+- WHEN the charger detail screen renders
+- THEN no "Editar" button is shown
 
 ## Non-functional notes
 
