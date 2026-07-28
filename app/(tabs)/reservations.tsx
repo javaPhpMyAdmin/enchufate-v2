@@ -250,6 +250,7 @@ function ReservationRow({
       otherPartyAvatarUri={party.avatarUrl}
       role={role}
       onPress={onPress}
+      chargingStartedAt={reservation.charging_started_at}
     />
   );
 }

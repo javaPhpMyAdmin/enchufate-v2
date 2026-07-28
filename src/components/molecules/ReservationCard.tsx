@@ -8,6 +8,8 @@ import { Card } from '@/components/atoms/Card';
 import { Icon } from '@/components/atoms/Icon';
 import { StatusPill, type StatusPillKind } from '@/components/atoms/StatusPill';
 import { useResolvedAddress } from '@/features/chargers/hooks/useResolvedAddress';
+import { useChargingTimer } from '@/hooks/useChargingTimer';
+import { isFeatureEnabled } from '@/lib/features';
 import { colors, spacing, typography } from '@/theme';
 
 export type ReservationRole = 'renter' | 'host';
@@ -33,6 +35,8 @@ export interface ReservationCardProps {
    * parent owns the confirmation modal; the card just delegates.
    */
   onCancel?: () => void;
+  /** ISO 8601 — set when charging is active (status 'en_curso'). */
+  chargingStartedAt?: string | null;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -50,10 +54,16 @@ export function ReservationCard({
   role,
   onPress,
   onCancel,
+  chargingStartedAt,
   style,
 }: ReservationCardProps): React.JSX.Element {
   const resolvedAddress = useResolvedAddress(address, lat, lng);
   const displayAddress = resolvedAddress.data ?? address;
+  const { elapsed } = useChargingTimer(
+    isFeatureEnabled('CHARGING_STATUS') && status === 'en_curso'
+      ? chargingStartedAt
+      : null,
+  );
   // The cancel CTA only renders when the parent provides a
   // handler AND the reservation is still cancellable. The
   // inline check matches the `isCancellable` rule from
@@ -97,6 +107,13 @@ export function ReservationCard({
           <Icon icon={Zap} size="sm" color={colors.textSecondary} />
           <Text style={styles.metaText}>{formatPower(powerKw)}</Text>
         </View>
+        {elapsed ? (
+          <View style={styles.chargingTimerRow}>
+            <Text style={styles.chargingTimerText}>
+              ⚡ Cargando hace {elapsed}
+            </Text>
+          </View>
+        ) : null}
       </View>
       {canCancel ? (
         <View style={styles.actions}>
@@ -127,5 +144,15 @@ const styles = StyleSheet.create({
   meta: { marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, gap: spacing.xs },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   metaText: { ...typography.caption, color: colors.textSecondary, flex: 1 },
+  chargingTimerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+  chargingTimerText: {
+    ...typography.caption,
+    color: colors.charging,
+    fontWeight: '700',
+  },
   actions: { marginTop: spacing.sm },
 });
