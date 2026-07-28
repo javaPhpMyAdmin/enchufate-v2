@@ -184,11 +184,12 @@ export function useChargers(
     return merged;
   }, [supabaseQuery.data, uteQuery.data, filters, userPosReady]);
 
+  // Spread supabaseQuery to satisfy UseQueryResult shape, then override data.
   return {
+    ...supabaseQuery,
     data,
-    isLoading: supabaseQuery.isLoading,
+    isLoading: supabaseQuery.isLoading || uteQuery.isLoading,
     error: supabaseQuery.error ?? uteQuery.error,
     isPlaceholderData: supabaseQuery.isPlaceholderData || uteQuery.isPlaceholderData,
-    refetch: supabaseQuery.refetch,
-  } as UseQueryResult<MapCharger[], Error>;
+  } as unknown as UseQueryResult<MapCharger[], Error>;
 }

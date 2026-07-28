@@ -32,10 +32,10 @@ import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 
 import { AppError, normalizeSupabaseError } from '@/lib/error';
 import { chargerSchema, type ScheduleInput } from '@/lib/schemas/charger';
+import type { ConnectorType, Currency } from '../types';
 import { isFeatureEnabled } from '@/lib/features';
 import { queryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
-import type { Currency } from '@/features/chargers/types';
 
 import { useSession } from '@/features/auth/hooks/useSession';
 
@@ -50,7 +50,7 @@ export interface UpdateChargerPayload {
   address?: string;
   lat?: number;
   lng?: number;
-  connector_type?: 'tipo_1' | 'tipo_2' | 'ccs' | 'chademo' | 'tesla';
+  connector_type?: ConnectorType;
   power_kw?: number;
   price_per_hour_usd?: number;
   currency?: Currency;

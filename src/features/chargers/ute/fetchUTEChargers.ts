@@ -34,7 +34,7 @@ interface UTEServiceStation {
   stationStatus?: string;
 }
 
-typeFTEResponse = UTEServiceStation[];
+type FTEResponse = UTEServiceStation[];
 
 // ── Connector type mapping ──────────────────────────────────
 
