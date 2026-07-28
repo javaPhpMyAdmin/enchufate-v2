@@ -5,36 +5,43 @@
  * Endpoint: https://movilidad.ute.com.uy/api/v1/station/status/map
  * Auth: unauthenticated, but requires a `uniqueKeyUser: nginx` header.
  *
- * The API returns live station status (available/occupied/out_of_service)
- * with connector details. We normalize into MapCharger[] so the map
- * can render UTE alongside P2P chargers.
+ * The API returns `{ data: [...] }` with live station status and connector
+ * details. We normalize into MapCharger[] so the map can render UTE
+ * alongside P2P chargers.
  */
 import type { ConnectorInfo, ConnectorType, MapCharger } from '../types';
 
 // ── Raw UTE API response types ─────────────────────────────
 
-interface UTEConnector {
+interface UTEConnectorStatus {
+  count?: number;
   /** e.g. "CCS2", "Tipo 2", "GB/T" */
-  connectorType?: string;
+  type?: string;
   power?: number;
-  /** e.g. "available", "occupied", "out_of_service" */
-  status?: string;
+  /** Numeric: 1 = Busy, 2 = Available, etc. */
+  status?: number;
+  /** e.g. "Busy", "Available", "Unknown" */
+  statusDetail?: string;
+  /** Whether the connector has an attached cable */
+  hose?: boolean;
 }
 
 interface UTEServiceStation {
-  id?: string;
-  stationName?: string;
-  stationAddress?: string;
-  city?: string;
+  source?: string;
+  name?: string;
+  address?: string;
+  lat?: number | null;
+  lng?: number | null;
+  connectorStatusAcc?: UTEConnectorStatus[];
   department?: string;
-  latitude?: number | null;
-  longitude?: number | null;
-  connectors?: UTEConnector[];
-  /** e.g. "operational", "limited", "offline" */
-  stationStatus?: string;
+  city?: string;
+  /** e.g. "Cargando", "Disponible", "Fuera de servicio" */
+  status?: string;
 }
 
-type FTEResponse = UTEServiceStation[];
+interface FTEResponse {
+  data: UTEServiceStation[];
+}
 
 // ── Connector type mapping ──────────────────────────────────
 
@@ -48,6 +55,14 @@ const CONNECTOR_MAP: Record<string, ConnectorType> = {
   Tesla: 'tesla',
 };
 
+// ── Status mapping ──────────────────────────────────────────
+
+const STATION_STATUS_MAP: Record<string, MapCharger['station_status']> = {
+  Disponible: 'operational',
+  Cargando: 'operational', // default/placeholder — not real-time status
+  'Fuera de servicio': 'offline',
+};
+
 // ── Normalization ────────────────────────────────────────────
 
 /**
@@ -55,42 +70,50 @@ const CONNECTOR_MAP: Record<string, ConnectorType> = {
  * Returns null when lat/lng are missing or invalid.
  */
 function normalizeUTESation(station: UTEServiceStation): MapCharger | null {
-  const lat = station.latitude;
-  const lng = station.longitude;
+  const lat = station.lat;
+  const lng = station.lng;
 
   // Exclude stations with null/invalid coordinates.
   if (lat == null || lng == null || lat === 0 || lng === 0) {
-    console.warn('[UTE] Excluding station with null/zero coords:', station.stationName);
+    console.warn('[UTE] Excluding station with null/zero coords:', station.name);
     return null;
   }
 
-  const connectors: ConnectorInfo[] = (station.connectors ?? []).map((c) => {
-    const rawType = c.connectorType ?? '';
+  const connectors: ConnectorInfo[] = (station.connectorStatusAcc ?? []).map((c) => {
+    const rawType = c.type ?? '';
     const type = CONNECTOR_MAP[rawType];
 
     if (type === undefined) {
-      console.warn(`[UTE] Unknown connector type: "${rawType}" in station "${station.stationName}"`);
+      console.warn(`[UTE] Unknown connector type: "${rawType}" in station "${station.name}"`);
     }
 
     return {
       type: type ?? 'tipo_2',
       power_kw: c.power ?? 0,
-      count: 1,
-      status: c.status as ConnectorInfo['status'] | undefined,
+      count: c.count ?? 1,
+      has_cable: c.hose ?? true,
+      status: c.statusDetail?.toLowerCase() === 'available'
+        ? 'available'
+        : c.statusDetail?.toLowerCase() === 'busy'
+          ? 'occupied'
+          : undefined,
     };
   });
 
+  const rawStatus = station.status ?? '';
+  const stationStatus = STATION_STATUS_MAP[rawStatus] ?? 'operational';
+
   return {
-    id: `ute-${station.id ?? 'unknown'}`,
+    id: `ute-${station.name?.replace(/\s+/g, '-').toLowerCase() ?? 'unknown'}`,
     source: 'ute',
-    title: station.stationName ?? 'Estación UTE',
-    address: station.stationAddress ?? '',
+    title: station.name ?? 'Estación UTE',
+    address: station.address ?? '',
     city: station.city,
     department: station.department,
     lat,
     lng,
     connectors,
-    station_status: station.stationStatus as MapCharger['station_status'],
+    station_status: stationStatus,
   };
 }
 
@@ -114,12 +137,13 @@ export async function fetchUTEChargers(): Promise<MapCharger[]> {
   const json = (await res.json()) as FTEResponse;
 
   // Defensive: warn if the API shape changed unexpectedly.
-  if (!Array.isArray(json)) {
-    console.warn('[UTE] Unexpected response shape — expected array, got', typeof json);
+  const stations = json.data;
+  if (!Array.isArray(stations)) {
+    console.warn('[UTE] Unexpected response shape — expected data array, got', typeof json.data);
     return [];
   }
 
-  const chargers = json
+  const chargers = stations
     .map(normalizeUTESation)
     .filter((c): c is MapCharger => c !== null);
 

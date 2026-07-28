@@ -23,13 +23,29 @@ export type ChargerStatus = 'active' | 'paused';
 export type MinReservationMinutes = 30 | 60 | 120 | 240 | 480;
 export type Currency = 'USD' | 'UYU' | 'ARS';
 
-export type ChargerSource = 'enchufate' | 'ute';
+export type ChargerSource = 'enchufate' | 'ute' | 'ocm';
 
 export interface ConnectorInfo {
   type: ConnectorType;
   power_kw: number;
   count: number;
   status?: 'available' | 'occupied' | 'out_of_service';
+  has_cable?: boolean;
+}
+
+// ── Connector helpers ────────────────────────────────────────
+
+/** AC vs DC classification. */
+export function connectorCurrent(type: ConnectorType): 'AC' | 'DC' {
+  return type === 'tipo_1' || type === 'tipo_2' ? 'AC' : 'DC';
+}
+
+/** Speed category based on power_kw. */
+export function connectorSpeedLabel(power_kw: number): string {
+  if (power_kw < 7) return 'Lenta';
+  if (power_kw < 22) return 'Semi-rápida';
+  if (power_kw < 50) return 'Rápida';
+  return 'Ultra-rápida';
 }
 
 /**

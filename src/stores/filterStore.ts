@@ -16,10 +16,10 @@
 import { create } from 'zustand';
 
 export type EstadoFilter = 'disponible' | 'pausado';
-export type ConectorFilter = 'tipo_1' | 'tipo_2' | 'ccs' | 'chademo' | 'tesla';
+export type ConectorFilter = 'tipo_1' | 'tipo_2' | 'ccs' | 'chademo' | 'tesla' | 'gb_t';
 export type PotenciaFilter = 'lenta' | 'semi_rapida' | 'rapida' | 'ultra';
 export type DistanciaFilter = 'cerca' | 'medio' | 'lejos';
-export type SourceFilter = 'enchufate' | 'ute';
+export type SourceFilter = 'enchufate' | 'ute' | 'ocm';
 
 export type FilterCategory =
   | 'estado'

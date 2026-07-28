@@ -40,7 +40,9 @@ export const FEATURES = {
   /** Reviews and ratings on chargers. */
   CHARGER_REVIEWS: true,
   /** UTE public charger integration (Phase 5). */
-  PUBLIC_CHARGERS: false,
+  PUBLIC_CHARGERS: true,
+  /** Open Charge Map public charger integration. */
+  OCM_CHARGERS: true,
 } as const;
 
 export type FeatureFlag = keyof typeof FEATURES;

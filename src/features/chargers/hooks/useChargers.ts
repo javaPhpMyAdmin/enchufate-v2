@@ -20,6 +20,7 @@ import { supabase } from '@/lib/supabase';
 
 import type { Charger, ConnectorInfo, MapCharger } from '../types';
 import type { MapFilters } from '@/stores/filterStore';
+import { useOCMChargers } from './useOCMChargers';
 import { useUTEChargers } from './useUTEChargers';
 
 const QUERY_KEY_ROOT = ['chargers'] as const;
@@ -124,6 +125,7 @@ export function useChargers(
 ): UseQueryResult<MapCharger[], Error> {
   const supabaseQuery = useSupabaseChargers(filters);
   const uteQuery = useUTEChargers();
+  const ocmQuery = useOCMChargers();
 
   // Cache user position for synchronous distance filtering in useMemo.
   const userPosRef = useRef<{ lat: number; lng: number } | null>(null);
@@ -141,7 +143,42 @@ export function useChargers(
   const data = useMemo(() => {
     const p2p = (supabaseQuery.data ?? []).map(normalizeToMapCharger);
     const ute = uteQuery.data ?? [];
-    let merged = [...p2p, ...ute];
+    const ocm = ocmQuery.data ?? [];
+
+    // ── 3-way merge: dedup OCM against UTE via 50m Haversine ────
+    //   UTE wins on connectors/status; OCM fills title/address gaps.
+    //   OCM-only stations (no UTE match within 50m) pass through.
+    //   P2P is NEVER deduped against OCM.
+    const enrichedUTE = ute.map((u) => ({ ...u })); // clone to avoid mutation
+    const ocmOnly: MapCharger[] = [];
+
+    for (const o of ocm) {
+      const nearestUTE = enrichedUTE.find((u) => {
+        const d = haversine(u.lat, u.lng, o.lat, o.lng);
+        return d <= 0.05; // 50 metres in km
+      });
+
+      if (nearestUTE) {
+        // UTE wins — fill metadata gaps from OCM.
+        if (!nearestUTE.title || nearestUTE.title === 'Estación UTE') {
+          nearestUTE.title = o.title;
+        }
+        if (!nearestUTE.address) {
+          nearestUTE.address = o.address;
+        }
+        if (!nearestUTE.city && o.city) {
+          nearestUTE.city = o.city;
+        }
+        if (!nearestUTE.department && o.department) {
+          nearestUTE.department = o.department;
+        }
+        // OCM entry is excluded — UTE representation takes priority.
+      } else {
+        ocmOnly.push(o);
+      }
+    }
+
+    let merged = [...p2p, ...enrichedUTE, ...ocmOnly];
 
     // ── Source filter ──────────────────────────────────────
     if (filters?.fuente === 'enchufate') {
@@ -149,6 +186,9 @@ export function useChargers(
     }
     if (filters?.fuente === 'ute') {
       merged = merged.filter((c) => c.source === 'ute');
+    }
+    if (filters?.fuente === 'ocm') {
+      merged = merged.filter((c) => c.source === 'ocm');
     }
 
     // ── Connector filter (matches any connector in connectors[]) ──
@@ -182,14 +222,14 @@ export function useChargers(
     }
 
     return merged;
-  }, [supabaseQuery.data, uteQuery.data, filters, userPosReady]);
+  }, [supabaseQuery.data, uteQuery.data, ocmQuery.data, filters, userPosReady]);
 
   // Spread supabaseQuery to satisfy UseQueryResult shape, then override data.
   return {
     ...supabaseQuery,
     data,
-    isLoading: supabaseQuery.isLoading || uteQuery.isLoading,
-    error: supabaseQuery.error ?? uteQuery.error,
-    isPlaceholderData: supabaseQuery.isPlaceholderData || uteQuery.isPlaceholderData,
+    isLoading: supabaseQuery.isLoading || uteQuery.isLoading || ocmQuery.isLoading,
+    error: supabaseQuery.error ?? uteQuery.error ?? ocmQuery.error,
+    isPlaceholderData: supabaseQuery.isPlaceholderData || uteQuery.isPlaceholderData || ocmQuery.isPlaceholderData,
   } as unknown as UseQueryResult<MapCharger[], Error>;
 }

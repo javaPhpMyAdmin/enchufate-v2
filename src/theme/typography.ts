@@ -22,7 +22,7 @@ export const typography = {
   title: { fontSize: 22, lineHeight: 28, fontWeight: weight.bold },
   heading: { fontSize: 18, lineHeight: 24, fontWeight: weight.semibold },
   body: { fontSize: 16, lineHeight: 24, fontWeight: weight.regular },
-  caption: { fontSize: 14, lineHeight: 20, fontWeight: weight.regular },
+  caption: { fontSize: 16, lineHeight: 20, fontWeight: weight.regular },
   tab: { fontSize: 12, lineHeight: 16, fontWeight: weight.medium },
 } as const satisfies Record<string, TextStyle>;
 

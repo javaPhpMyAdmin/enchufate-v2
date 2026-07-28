@@ -47,6 +47,7 @@ const CONECTOR_OPTIONS: ReadonlyArray<FilterChipRowOption> = [
   { label: 'CHAdeMO', value: 'chademo' },
   { label: 'Tipo 1', value: 'tipo_1' },
   { label: 'Tesla', value: 'tesla' },
+  { label: 'GB/T', value: 'gb_t' },
 ];
 
 const POTENCIA_OPTIONS: ReadonlyArray<FilterChipRowOption> = [
@@ -68,6 +69,7 @@ const FUENTE_OPTIONS: ReadonlyArray<FilterChipRowOption> = [
   { label: 'Todos', value: '__none__' },
   { label: 'Enchúfate', value: 'enchufate' },
   { label: 'UTE', value: 'ute' },
+  { label: 'OCM', value: 'ocm' },
 ];
 
 const NONE_SENTINEL = '__none__';

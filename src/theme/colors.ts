@@ -31,6 +31,9 @@ export const colors = {
   // Chat
   bubbleIncoming: '#E8EDF5',
 
+  // UTE brand blue
+  ute: '#1E6BF5',
+
   // Info banner (BetaBanner)
   infoBg: '#DBEAFE',
   infoText: '#1E3A8A',

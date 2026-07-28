@@ -1,11 +1,11 @@
 /**
- * ChargerPopup — compact floating card shown when a charger marker is tapped.
+ * ChargerPopup — preview card for a selected charger marker.
  *
- * Positioned above the marker using screen coordinates from
- * MapContent.getPointInView. Uses onLayout for precise height.
+ * Rendered at the bottom of the map (not overlaying it), so map gestures
+ * like pinch-to-zoom always work. Distance is fetched by the parent
+ * (map.tsx) via OSRM and passed as routeDistanceMeters.
  *
- * Distance is fetched by the parent (map.tsx) via OSRM and passed
- * as routeDistanceMeters.
+ * Dismiss via the ✕ close button.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -17,10 +17,19 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-import { CONNECTOR_LABEL, type ChargerSource, type ConnectorInfo, type ConnectorType, type Currency } from '@/features/chargers/types';
+import {
+  CONNECTOR_LABEL,
+  connectorCurrent,
+  connectorSpeedLabel,
+  type ChargerSource,
+  type ConnectorInfo,
+  type ConnectorType,
+  type Currency,
+} from '@/features/chargers/types';
 import { URUGUAY_FALLBACK } from '@/lib/location';
 import { getCurrentPosition } from '@/lib/location';
 import { formatPrice } from '@/lib/format';
@@ -36,14 +45,15 @@ export interface ChargerPopupProps {
   currency: Currency;
   lat: number;
   lng: number;
+  /** Screen-space coordinates of the marker pin — card floats above this. */
   position?: { x: number; y: number } | null;
   routeDistanceMeters?: number | null;
+  stationStatus?: 'operational' | 'limited' | 'offline';
   onPressDetail: () => void;
   onDismiss: () => void;
 }
 
 const CARD_WIDTH = 230;
-const ARROW_OFFSET = 10; // small gap between marker and card
 
 function formatDistance(meters: number): string {
   const km = meters / 1000;
@@ -52,7 +62,12 @@ function formatDistance(meters: number): string {
 }
 
 /** Haversine fallback when OSRM is unavailable. */
-function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+function haversineMeters(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
@@ -80,8 +95,15 @@ export function ChargerPopup({
   onDismiss,
 }: ChargerPopupProps) {
   const [fallbackDistance, setFallbackDistance] = useState<number | null>(null);
-  const [loadingFallback, setLoadingFallback] = useState(routeDistanceMeters == null);
+  const [loadingFallback, setLoadingFallback] = useState(
+    routeDistanceMeters == null,
+  );
   const [cardHeight, setCardHeight] = useState(0);
+  const insets = useSafeAreaInsets();
+
+  const handleCardLayout = useCallback((e: LayoutChangeEvent) => {
+    setCardHeight(e.nativeEvent.layout.height);
+  }, []);
 
   // Haversine fallback if parent didn't provide OSRM distance.
   useEffect(() => {
@@ -97,107 +119,152 @@ export function ChargerPopup({
       setFallbackDistance(haversineMeters(userLat, userLng, lat, lng));
       setLoadingFallback(false);
     });
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [routeDistanceMeters, lat, lng]);
 
   const displayDistance = routeDistanceMeters ?? fallbackDistance;
   const showLoading = loadingFallback && displayDistance == null;
 
-  const handleBackdropPress = useCallback(() => {
-    onDismiss();
-  }, [onDismiss]);
-
-  const handleCardLayout = useCallback((e: LayoutChangeEvent) => {
-    setCardHeight(e.nativeEvent.layout.height);
-  }, []);
-
-  // ── Positioning: always above the marker, centered ──
+  // ── Position card above the marker (no backdrop — map stays interactable) ──
   const hasCoords = position != null;
   const cardLeft = hasCoords
-    ? Math.max(8, Math.min(position.x - CARD_WIDTH / 2, SCREEN_WIDTH - CARD_WIDTH - 8))
+    ? Math.max(
+        8,
+        Math.min(position.x - CARD_WIDTH / 2, SCREEN_WIDTH - CARD_WIDTH - 8),
+      )
     : spacing.md;
   const cardTop = hasCoords
-    ? Math.max(8, position.y - cardHeight - ARROW_OFFSET)
+    ? Math.max(insets.top + 8, position.y - cardHeight - 10)
     : undefined;
   const cardBottom = hasCoords ? undefined : 80;
 
   return (
-    <>
-      {/* Backdrop — tap to dismiss */}
-      <Pressable style={styles.backdrop} onPress={handleBackdropPress} />
-
-      {/* Card */}
-      <View
-        onLayout={handleCardLayout}
-        style={[
-          styles.card,
-          hasCoords
-            ? { left: cardLeft, top: cardTop }
-            : { left: spacing.md, right: spacing.md, bottom: cardBottom },
-        ]}
-      >
-        {/* Title */}
-        <View style={styles.titleRow}>
-          <Text style={styles.title} numberOfLines={1}>{title}</Text>
-          {source === 'ute' && (
-            <View style={styles.uteBadge}>
-              <Text style={styles.uteBadgeText}>UTE</Text>
-            </View>
-          )}
-        </View>
-
-        {source === 'ute' ? (
-          /* ── UTE connector list ────────────────────────── */
-          <View style={styles.uteConnectors}>
-            {connectors.map((conn, i) => (
-              <Text key={i} style={styles.uteConnectorRow}>
-                {CONNECTOR_LABEL[conn.type]} · {conn.power_kw} kW × {conn.count}
-                {conn.status ? ` · ${conn.status}` : ''}
-              </Text>
-            ))}
+    <View
+      onLayout={handleCardLayout}
+      style={[
+        styles.card,
+        hasCoords
+          ? { left: cardLeft, top: cardTop }
+          : { left: spacing.md, right: spacing.md, bottom: cardBottom },
+      ]}
+    >
+      {/* Title + close button */}
+      <View style={styles.titleRow}>
+        <Text style={styles.title} numberOfLines={1}>
+          {title}
+        </Text>
+        {/* {source === 'ocm' && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>OCM</Text>
           </View>
-        ) : (
-          /* ── P2P single connector + price ──────────────── */
-          <>
-            <View style={styles.infoRow}>
-              <Text style={styles.info}>
-                {CONNECTOR_LABEL[connectorType]} · {powerKw} kW
-              </Text>
-              <Text style={styles.infoDot}>·</Text>
-              <Text style={styles.info}>
-                {formatPrice(pricePerHour, currency)}/h
-              </Text>
-            </View>
-          </>
         )}
-
-        {/* Row: distance + Ver button (P2P only) */}
-        <View style={styles.actionRow}>
-          <View style={styles.distanceWrap}>
-            {showLoading ? (
-              <ActivityIndicator size={12} color={colors.primary} />
-            ) : displayDistance != null ? (
-              <Text style={styles.distance}>
-                ~{formatDistance(displayDistance)} por ruta
-              </Text>
-            ) : null}
+        {source === 'ute' && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>UTE</Text>
           </View>
-          {source !== 'ute' && (
-            <Pressable style={styles.verButton} onPress={onPressDetail}>
-              <Text style={styles.verButtonText}>Ver</Text>
-            </Pressable>
-          )}
-        </View>
+        )} */}
+        <Pressable
+          onPress={onDismiss}
+          style={styles.closeButton}
+          hitSlop={8}
+          accessibilityLabel="Cerrar"
+          accessibilityRole="button"
+        >
+          <Text style={styles.closeIcon}>✕</Text>
+        </Pressable>
       </View>
-    </>
+
+      {source === 'ute' ? (
+        /* ── UTE connector list ────────────────────────── */
+        <View style={styles.uteConnectors}>
+          {connectors.map((conn, i) => {
+            const current = connectorCurrent(conn.type);
+            const speed = connectorSpeedLabel(conn.power_kw);
+            const cableLabel = conn.has_cable ? 'Con cable' : 'Sin cable';
+            const statusLabel = conn.status === 'available'
+              ? 'Disponible'
+              : conn.status === 'occupied'
+                ? 'Ocupado'
+                : null;
+            return (
+              <View key={i} style={styles.uteConnectorRow}>
+                <Text style={styles.uteConnectorText}>
+                  {CONNECTOR_LABEL[conn.type]} · {conn.power_kw} kW · {speed} (
+                  {current})
+                </Text>
+                <View style={styles.uteMetaRow}>
+                  <Text style={styles.uteConnectorMeta}>
+                    Conectores {conn.count} · {cableLabel}
+                    {statusLabel ? ` · ${statusLabel}` : ''}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      ) : source === 'ocm' && connectors.length > 0 ? (
+        /* ── OCM connector list ──────────────────────── */
+        <View style={styles.ocmConnectors}>
+          {connectors.map((conn, i) => {
+            const speed = connectorSpeedLabel(conn.power_kw);
+            const cableLabel =
+              conn.has_cable != null
+                ? conn.has_cable
+                  ? ' · Con cable'
+                  : ' · Sin cable'
+                : '';
+            return (
+              <View key={i} style={styles.ocmConnectorRow}>
+                <Text style={styles.ocmConnectorText}>
+                  {CONNECTOR_LABEL[conn.type]} · {conn.power_kw} kW · {speed}
+                </Text>
+                <Text style={styles.ocmConnectorMeta}>
+                  {conn.count} conector{conn.count > 1 ? 'es' : ''}
+                  {cableLabel}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        /* ── P2P (enchufate) single connector ─────────── */
+        <>
+          <View style={styles.infoRow}>
+            <Text style={styles.info}>
+              {CONNECTOR_LABEL[connectorType]} · {powerKw} kW
+            </Text>
+            <Text style={styles.infoDot}>·</Text>
+            <Text style={styles.info}>
+              {formatPrice(pricePerHour, currency)}/h
+            </Text>
+          </View>
+        </>
+      )}
+
+      {/* Row: distance + Ver button (P2P only) */}
+      <View style={styles.actionRow}>
+        <View style={styles.distanceWrap}>
+          {showLoading ? (
+            <ActivityIndicator size={12} color={colors.primary} />
+          ) : displayDistance != null ? (
+            <Text style={styles.distance}>
+              {formatDistance(displayDistance)}.
+            </Text>
+          ) : null}
+        </View>
+        {source === 'enchufate' && (
+          <Pressable style={styles.verButton} onPress={onPressDetail}>
+            <Text style={styles.verButtonText}>Ver</Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 30,
-  },
   card: {
     position: 'absolute',
     width: CARD_WIDTH,
@@ -205,7 +272,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    gap: 4,
+    gap: 5,
     zIndex: 31,
     ...shadows.card,
   },
@@ -213,35 +280,74 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textPrimary,
     fontWeight: '700',
+    flex: 1,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
   },
-  uteBadge: {
-    backgroundColor: '#1E6BF5',
+  badge: {
+    backgroundColor: colors.primary,
     borderRadius: radius.button,
     paddingHorizontal: spacing.xs,
-    paddingVertical: 1,
+    paddingVertical: 3,
   },
-  uteBadgeText: {
+  badgeText: {
     ...typography.caption,
     color: colors.textOnPrimary,
     fontWeight: '700',
-    fontSize: 10,
+    fontSize: 9,
+  },
+  closeButton: {
+    marginLeft: 'auto',
+    padding: 2,
+  },
+  closeIcon: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    lineHeight: 18,
   },
   uteConnectors: {
-    gap: 2,
+    gap: 4,
   },
   uteConnectorRow: {
+    gap: 2,
+  },
+  uteConnectorText: {
     ...typography.caption,
     color: colors.textSecondary,
+  },
+  uteMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  uteConnectorMeta: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12.5,
+    opacity: 0.8,
+  },
+  ocmConnectors: {
+    gap: 4,
+  },
+  ocmConnectorRow: {
+    gap: 1,
+  },
+  ocmConnectorText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  ocmConnectorMeta: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12.5,
+    opacity: 0.8,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 7,
   },
   info: {
     ...typography.caption,
@@ -262,17 +368,20 @@ const styles = StyleSheet.create({
   distance: {
     ...typography.caption,
     color: colors.primary,
-    fontWeight: '600',
+    fontWeight: '800',
   },
   verButton: {
     backgroundColor: colors.primary,
     borderRadius: radius.button,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    marginTop: spacing.sm,
+    width: 80,
   },
   verButtonText: {
     ...typography.caption,
     color: colors.textOnPrimary,
     fontWeight: '700',
+    textAlign: 'center',
   },
 });

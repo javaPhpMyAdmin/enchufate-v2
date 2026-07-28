@@ -98,6 +98,11 @@ export default function ChargerDetailScreen() {
   const [photoIndex, setPhotoIndex] = useState(0);
   const createReservation = useCreateReservation();
   const toggleStatus = useToggleChargerStatus();
+  const resolvedAddress = useResolvedAddress(
+    charger.data?.address ?? '',
+    charger.data?.lat ?? -34.9,
+    charger.data?.lng ?? -56.2,
+  );
 
   const onOpenInMaps = useCallback(() => {
     const data = charger.data;
@@ -230,7 +235,6 @@ export default function ChargerDetailScreen() {
   }
 
   const c = charger.data;
-  const resolvedAddress = useResolvedAddress(c.address, c.lat, c.lng);
   const displayAddress = resolvedAddress.data ?? c.address;
   const photos = c.photos?.length > 0 ? c.photos : [null];
   const total = photos.length;

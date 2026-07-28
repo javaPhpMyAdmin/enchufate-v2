@@ -12,18 +12,18 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
-import type { NativeSyntheticEvent } from 'react-native';
+// import type { NativeSyntheticEvent } from 'react-native';
 import { SlidersHorizontal } from 'lucide-react-native';
 
 import { FAB } from '@/components/atoms/FAB';
 import { Icon } from '@/components/atoms/Icon';
 import { URUGUAY_FALLBACK } from '@/lib/location';
-import { colors, radius, shadows, spacing, typography } from '@/theme';
+import { colors, radius, spacing, typography } from '@/theme';
+import Mapbox from '@rnmapbox/maps';
 
 // ── Constants ────────────────────────────────────────────────
 const MAPBOX_STYLE = MapboxGL.StyleURL.Street;
 const CARGADOR_ICON_ID = 'cargador';
-const UTE_MARKER_ICON_ID = 'ute-marker';
 
 // Inicializa el token público (el que empieza con pk.)
 MapboxGL.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN || '');
@@ -100,8 +100,24 @@ export default function MapContent({
     const lats = routeCoords.map((c) => c[1]);
     const ne: [number, number] = [Math.max(...lngs), Math.max(...lats)];
     const sw: [number, number] = [Math.min(...lngs), Math.min(...lats)];
+
+    // Ensure a minimum bounds size so short routes don't zoom in too tight.
+    const MIN_DEG = 0.006; // ~660 m — enough headroom for nearby chargers
+    const lngSpan = ne[0] - sw[0];
+    const latSpan = ne[1] - sw[1];
+    if (lngSpan < MIN_DEG) {
+      const pad = (MIN_DEG - lngSpan) / 2;
+      sw[0] -= pad;
+      ne[0] += pad;
+    }
+    if (latSpan < MIN_DEG) {
+      const pad = (MIN_DEG - latSpan) / 2;
+      sw[1] -= pad;
+      ne[1] += pad;
+    }
+
     cameraRef.current.setCamera({
-      bounds: { ne, sw, padding: 120 },
+      bounds: { ne, sw, padding: 60 },
       animationMode: 'easeTo',
       animationDuration: 600,
     });
@@ -110,13 +126,13 @@ export default function MapContent({
     // stays above the marker at its new screen location.
     if (selectedChargerCoord && onMarkerScreenCoords && mapViewRef.current) {
       const timer = setTimeout(() => {
-        mapViewRef.current?.getPointInView(selectedChargerCoord).then(
-          (point: number[] | null) => {
+        mapViewRef.current
+          ?.getPointInView(selectedChargerCoord)
+          .then((point: number[] | null) => {
             if (point && point[0] != null && point[1] != null) {
               onMarkerScreenCoords({ x: point[0], y: point[1] });
             }
-          },
-        );
+          });
       }, 650); // slightly after animation completes
       return () => clearTimeout(timer);
     }
@@ -149,7 +165,9 @@ export default function MapContent({
   const handleShapePress = useCallback(
     async (event: any) => {
       const feature = event.features?.[0] ?? event.nativeEvent?.features?.[0];
-      const coords = feature?.geometry?.coordinates as [number, number] | undefined;
+      const coords = feature?.geometry?.coordinates as
+        | [number, number]
+        | undefined;
       if (coords && onMarkerScreenCoords && mapViewRef.current) {
         const point = await mapViewRef.current.getPointInView(coords);
         if (point) {
@@ -179,12 +197,16 @@ export default function MapContent({
           centerCoordinate={INITIAL_CAMERA.centerCoordinate}
           zoomLevel={INITIAL_CAMERA.zoomLevel}
           animationDuration={0}
-          padding={{ paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: 0, paddingRight: 0 }}
+          padding={{
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom,
+            paddingLeft: 0,
+            paddingRight: 0,
+          }}
         />
         <MapboxGL.Images
           images={{
             [CARGADOR_ICON_ID]: require('@/../assets/icons/cargador.png'),
-            [UTE_MARKER_ICON_ID]: require('@/../assets/icons/ute-marker.png'),
           }}
         />
         {geojson ? (
@@ -193,8 +215,8 @@ export default function MapContent({
             ref={sourceRef}
             shape={geojson}
             cluster
-            clusterRadius={50}
-            clusterMaxZoomLevel={14}
+            clusterRadius={30}
+            clusterMaxZoomLevel={20}
             onPress={handleShapePress}
           >
             {/* Cluster bubble (rendered at zoom < 14). */}
@@ -229,37 +251,95 @@ export default function MapContent({
             {/* Individual P2P charger pin (zoom >= 14, source=enchufate). */}
             <MapboxGL.SymbolLayer
               id="charger-pin"
-              filter={['all', ['!', ['has', 'point_count']], ['==', 'source', 'enchufate']]}
+              filter={[
+                'all',
+                ['!', ['has', 'point_count']],
+                ['==', 'source', 'enchufate'],
+              ]}
               style={{
                 iconImage: CARGADOR_ICON_ID,
-                iconSize: 0.12,
+                iconSize: 0.16,
                 iconAnchor: 'bottom',
                 iconAllowOverlap: true,
               }}
             />
-            {/* Individual UTE charger pin (zoom >= 14, source=ute). */}
+            {/* Individual UTE charger pin — blue circle + "UTE" text (source=ute). */}
+            <MapboxGL.CircleLayer
+              id="ute-pin-bg"
+              filter={[
+                'all',
+                ['!', ['has', 'point_count']],
+                ['==', 'source', 'ute'],
+              ]}
+              style={{
+                circleColor: colors.ute,
+                circleRadius: 16,
+                circleStrokeWidth: 2,
+                circleStrokeColor: colors.surface,
+              }}
+            />
             <MapboxGL.SymbolLayer
               id="ute-pin"
-              filter={['all', ['!', ['has', 'point_count']], ['==', 'source', 'ute']]}
+              filter={[
+                'all',
+                ['!', ['has', 'point_count']],
+                ['==', 'source', 'ute'],
+              ]}
               style={{
-                iconImage: UTE_MARKER_ICON_ID,
-                iconSize: 1,
-                iconAnchor: 'bottom',
-                iconAllowOverlap: true,
+                textField: 'UTE',
+                textSize: 10,
+                textColor: colors.textOnPrimary,
+                textFont: [
+                  'DIN Offc Pro Bold',
+                  'Open Sans Bold',
+                  'Arial Unicode MS Bold',
+                ],
+                textAllowOverlap: true,
+              }}
+            />
+            {/* Individual OCM charger pin — blue circle + "OCM" text (source=ocm). */}
+            <MapboxGL.CircleLayer
+              id="ocm-pin-bg"
+              filter={[
+                'all',
+                ['!', ['has', 'point_count']],
+                ['==', 'source', 'ocm'],
+              ]}
+              style={{
+                circleColor: colors.ute,
+                circleRadius: 16,
+                circleStrokeWidth: 2,
+                circleStrokeColor: colors.surface,
+              }}
+            />
+            <MapboxGL.SymbolLayer
+              id="ocm-pin"
+              filter={[
+                'all',
+                ['!', ['has', 'point_count']],
+                ['==', 'source', 'ocm'],
+              ]}
+              style={{
+                textField: 'OCM',
+                textSize: 10,
+                textColor: colors.textOnPrimary,
+                textFont: [
+                  'DIN Offc Pro Bold',
+                  'Open Sans Bold',
+                  'Arial Unicode MS Bold',
+                ],
+                textAllowOverlap: true,
               }}
             />
           </MapboxGL.ShapeSource>
         ) : null}
 
         {/* Route polyline (OSRM) — always mounted to prevent flicker on zoom. */}
-        <MapboxGL.ShapeSource
-          id="route-source"
-          shape={routeGeoJSON}
-        >
+        <MapboxGL.ShapeSource id="route-source" shape={routeGeoJSON}>
           <MapboxGL.LineLayer
             id="route-line"
             style={{
-              lineColor: colors.primary,
+              lineColor: 'black',
               lineWidth: 4,
               lineCap: 'round',
               lineJoin: 'round',
@@ -267,6 +347,12 @@ export default function MapContent({
             }}
           />
         </MapboxGL.ShapeSource>
+        <Mapbox.UserLocation
+          animated={true}
+          androidRenderMode={'gps'}
+          visible={true}
+          showsUserHeadingIndicator={true}
+        />
       </MapboxGL.MapView>
 
       {/* Loading bar — thin animated indicator during filter refreshes. */}
@@ -291,7 +377,11 @@ export default function MapContent({
         onPress={onFilterPress}
         style={({ pressed }) => [
           styles.pill,
-          { position: 'absolute', top: insets.top + spacing.sm, left: spacing.lg },
+          {
+            position: 'absolute',
+            top: insets.top + spacing.sm,
+            left: spacing.lg,
+          },
           pressed && styles.pillPressed,
         ]}
         accessibilityRole="button"
@@ -307,12 +397,18 @@ export default function MapContent({
         pointerEvents="none"
         style={[styles.attribution, { bottom: insets.bottom + spacing.xs }]}
       >
-        <Text style={styles.attributionText}>
+        {/* <Text style={styles.attributionText}>
           © Mapbox © OpenStreetMap contributors
-        </Text>
+        </Text> */}
       </View>
 
       {/* Recenter FAB — bottom-right. */}
+      <Mapbox.UserLocation
+        animated={true}
+        androidRenderMode={'gps'}
+        visible={true}
+        showsUserHeadingIndicator={true}
+      />
       <FAB
         onPress={onRecenter}
         accessibilityLabel="Centrar mapa en tu ubicación"
