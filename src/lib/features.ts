@@ -37,6 +37,10 @@ export const FEATURES = {
   IN_APP_PAYMENTS: false,
   /** Edit / delete an existing charger. Deferred to v2.1. */
   EDIT_CHARGER: true,
+  /** Real-time P2P charging state — host marks when guest is charging.
+   *  Orange pins on map + timer in popup/cards/detail. Default false
+   *  until the UI layers land in PR 2. */
+  CHARGING_STATUS: false,
   /** Reviews and ratings on chargers. */
   CHARGER_REVIEWS: true,
   /** UTE public charger integration (Phase 5). */

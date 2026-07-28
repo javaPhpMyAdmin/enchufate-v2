@@ -79,6 +79,7 @@ function normalizeToMapCharger(c: Charger): MapCharger {
     currency: c.currency,
     status: c.status,
     owner_id: c.owner_id,
+    current_charging_since: c.current_charging_since ?? undefined,
   };
 }
 

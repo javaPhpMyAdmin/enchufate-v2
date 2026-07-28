@@ -16,7 +16,7 @@
  */
 import { formatDateTime } from '@/lib/format';
 
-export type ReservationStatus = 'solicitada' | 'confirmada' | 'cancelada' | 'completada';
+export type ReservationStatus = 'solicitada' | 'confirmada' | 'en_curso' | 'cancelada' | 'completada';
 
 export type ReservationRole = 'renter' | 'host';
 
@@ -47,6 +47,8 @@ export interface Reservation {
   end_at: string | null;
   /** Free-text fallback per the Q5 default. */
   horario_a_coordinar: string | null;
+  /** ISO 8601 — set when the host starts charging (status → en_curso). */
+  charging_started_at: string | null;
   status: ReservationStatus;
   created_at: string;
   updated_at: string;
@@ -90,7 +92,7 @@ export function otherParty(
 
 /** Whether the cancel CTA should render for a given status. */
 export function isCancellable(status: ReservationStatus): boolean {
-  return status === 'solicitada' || status === 'confirmada';
+  return status === 'solicitada' || status === 'confirmada' || status === 'en_curso';
 }
 
 /**

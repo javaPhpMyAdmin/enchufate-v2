@@ -37,6 +37,9 @@ export const colors = {
   // Info banner (BetaBanner)
   infoBg: '#DBEAFE',
   infoText: '#1E3A8A',
+
+  // Charging status — visual indicator for active charging
+  charging: '#E87D2F',
 } as const;
 
 export type ColorToken = keyof typeof colors;

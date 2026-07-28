@@ -70,6 +70,10 @@ export interface MapCharger {
   owner_id?: string;
   // Populated when source='ute' for connector-list display
   station_status?: 'operational' | 'limited' | 'offline';
+  /** Set when this P2P charger is in an active charging session.
+   *  ISO 8601 timestamp populated by the DB trigger on en_curso
+   *  transitions; null when idle or completed. */
+  current_charging_since?: string;
 }
 
 export type DayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
@@ -102,6 +106,7 @@ export interface Charger {
   status: ChargerStatus;
   avg_rating: number;
   review_count: number;
+  current_charging_since: string | null;
   created_at: string;
   updated_at: string;
 }
