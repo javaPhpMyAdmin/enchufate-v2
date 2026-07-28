@@ -39,6 +39,8 @@ export const FEATURES = {
   EDIT_CHARGER: true,
   /** Reviews and ratings on chargers. */
   CHARGER_REVIEWS: true,
+  /** UTE public charger integration (Phase 5). */
+  PUBLIC_CHARGERS: false,
 } as const;
 
 export type FeatureFlag = keyof typeof FEATURES;
