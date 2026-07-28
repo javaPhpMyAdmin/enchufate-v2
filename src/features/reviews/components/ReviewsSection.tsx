@@ -7,6 +7,9 @@
  *
  * Empty state: "Sin reseñas todavía".
  * Error state: inline error with retry.
+ *
+ * When there are more reviews, a "Ver más reseñas" button appears
+ * at the bottom to load the next page (offset-based pagination).
  */
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -15,7 +18,6 @@ import { Star } from 'lucide-react-native';
 import { Card } from '@/components/atoms/Card';
 import { Icon } from '@/components/atoms/Icon';
 import { useChargerRating } from '@/features/reviews/hooks/useChargerRating';
-import { useRespondToReview } from '@/features/reviews/hooks/useRespondToReview';
 import { useReviews } from '@/features/reviews/hooks/useReviews';
 import { isFeatureEnabled } from '@/lib/features';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -24,14 +26,12 @@ import { ReviewCard } from './ReviewCard';
 
 export interface ReviewsSectionProps {
   chargerId: string;
-  /** The charger owner's user id. When set, the owner can respond to reviews. */
-  ownerId?: string;
 }
 
-export function ReviewsSection({ chargerId, ownerId }: ReviewsSectionProps): React.JSX.Element | null {
+export function ReviewsSection({ chargerId }: ReviewsSectionProps): React.JSX.Element | null {
   if (!isFeatureEnabled('CHARGER_REVIEWS')) return null;
 
-  return <ReviewsSectionInner chargerId={chargerId} ownerId={ownerId} />;
+  return <ReviewsSectionInner chargerId={chargerId} />;
 }
 
 /* ------------------------------------------------------------------ */
@@ -40,24 +40,17 @@ export function ReviewsSection({ chargerId, ownerId }: ReviewsSectionProps): Rea
 
 function ReviewsSectionInner({
   chargerId,
-  ownerId,
 }: {
   chargerId: string;
-  ownerId?: string;
 }): React.JSX.Element {
   const rating = useChargerRating(chargerId);
   const reviews = useReviews(chargerId);
-  const { respondToReview, isPending: isResponding } = useRespondToReview();
 
   const avgRating = rating.data?.avg_rating ?? 0;
   const reviewCount = rating.data?.review_count ?? 0;
 
   const displayRating = avgRating > 0 ? avgRating.toFixed(1) : '0.0';
   const hasReviews = reviewCount > 0;
-
-  const handleRespond = (reviewId: string, response: string) => {
-    void respondToReview({ reviewId, chargerId, response });
-  };
 
   return (
     <View style={styles.section}>
@@ -91,15 +84,24 @@ function ReviewsSectionInner({
         </Card>
       ) : hasReviews ? (
         <View style={styles.reviewList}>
-          {(reviews.data ?? []).map((review) => (
-            <ReviewCard
-              key={review.id}
-              review={review}
-              isOwner={Boolean(ownerId)}
-              onRespond={handleRespond}
-              isResponding={isResponding}
-            />
+          {reviews.reviews.map((review) => (
+            <ReviewCard key={review.id} review={review} />
           ))}
+
+          {/* Load-more button */}
+          {reviews.hasNextPage ? (
+            <Pressable
+              onPress={reviews.fetchNextPage}
+              disabled={reviews.isFetchingNextPage}
+              style={styles.loadMoreButton}
+            >
+              {reviews.isFetchingNextPage ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Text style={styles.loadMoreText}>Ver más reseñas</Text>
+              )}
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -123,4 +125,14 @@ const styles = StyleSheet.create({
   retryText: { ...typography.caption, color: colors.primary, fontWeight: '600' },
 
   reviewList: { gap: spacing.sm },
+
+  loadMoreButton: {
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+  },
+  loadMoreText: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: '600',
+  },
 });

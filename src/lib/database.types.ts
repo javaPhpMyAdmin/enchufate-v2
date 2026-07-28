@@ -373,8 +373,6 @@ export type Database = {
           id: string
           rating: number
           reservation_id: string
-          responded_at: string | null
-          response: string | null
           reviewer_id: string
           text: string | null
         }
@@ -384,8 +382,6 @@ export type Database = {
           id?: string
           rating: number
           reservation_id: string
-          responded_at?: string | null
-          response?: string | null
           reviewer_id: string
           text?: string | null
         }
@@ -395,8 +391,6 @@ export type Database = {
           id?: string
           rating?: number
           reservation_id?: string
-          responded_at?: string | null
-          response?: string | null
           reviewer_id?: string
           text?: string | null
         }

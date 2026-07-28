@@ -28,10 +28,6 @@ export interface ReviewerProfile {
 /** A review with its reviewer profile inlined (Supabase join). */
 export interface ReviewWithReviewer extends Review {
   reviewer: ReviewerProfile;
-  /** Host's response text, if any. */
-  response?: string | null;
-  /** ISO timestamp of when the host responded. */
-  responded_at?: string | null;
 }
 
 /** Input for the create-review mutation. */

@@ -46,6 +46,8 @@ import {
 import { useSession } from '@/features/auth/hooks/useSession';
 import { useReservations } from '@/features/reservations/hooks/useReservations';
 import { otherParty, timeBlock, type Reservation, type ReservationRole } from '@/features/reservations/types';
+import { useReviewEligibility } from '@/features/reviews/hooks/useReviewEligibility';
+import { isFeatureEnabled } from '@/lib/features';
 import { formatDateTime } from '@/lib/format';
 import { colors, radius, spacing, typography } from '@/theme';
 
@@ -233,10 +235,22 @@ function ReservationRow({
   currentUserId: string;
   onPress: () => void;
 }): React.JSX.Element {
+  const router = useRouter();
   const party = otherParty(reservation, currentUserId);
   const time = timeBlock(reservation);
   // ReservationCard's expected `status` is the StatusPillKind, which
   // is a superset of ReservationStatus (it also includes 'disponible').
+  const showReviewCta =
+    isFeatureEnabled('CHARGER_REVIEWS') &&
+    role === 'renter' &&
+    reservation.status === 'completada';
+  const eligibility = useReviewEligibility(
+    showReviewCta ? reservation.id : null,
+  );
+  const reviewCta =
+    showReviewCta && eligibility.data?.canReview
+      ? () => router.push(`/review/${reservation.id}` as never)
+      : undefined;
   return (
     <ReservationCard
       status={reservation.status}
@@ -251,6 +265,7 @@ function ReservationRow({
       role={role}
       onPress={onPress}
       chargingStartedAt={reservation.charging_started_at}
+      onReviewPress={reviewCta}
     />
   );
 }

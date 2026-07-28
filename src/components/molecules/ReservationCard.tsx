@@ -35,6 +35,12 @@ export interface ReservationCardProps {
    * parent owns the confirmation modal; the card just delegates.
    */
   onCancel?: () => void;
+  /**
+   * Optional review CTA callback. When set AND status is
+   * `completada` AND the `CHARGER_REVIEWS` feature flag is on,
+   * a "Dejar reseña" button renders below the card content.
+   */
+  onReviewPress?: () => void;
   /** ISO 8601 — set when charging is active (status 'en_curso'). */
   chargingStartedAt?: string | null;
   style?: StyleProp<ViewStyle>;
@@ -54,6 +60,7 @@ export function ReservationCard({
   role,
   onPress,
   onCancel,
+  onReviewPress,
   chargingStartedAt,
   style,
 }: ReservationCardProps): React.JSX.Element {
@@ -124,6 +131,18 @@ export function ReservationCard({
             fullWidth
             onPress={onCancel}
             accessibilityLabel={`Cancelar reserva de ${chargerTitle}`}
+          />
+        </View>
+      ) : null}
+      {isFeatureEnabled('CHARGER_REVIEWS') && status === 'completada' && onReviewPress ? (
+        <View style={styles.actions}>
+          <Button
+            label="Dejar reseña"
+            variant="secondary"
+            size="sm"
+            fullWidth
+            onPress={onReviewPress}
+            accessibilityLabel={`Dejar reseña para ${chargerTitle}`}
           />
         </View>
       ) : null}
