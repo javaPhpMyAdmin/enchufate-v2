@@ -21,6 +21,7 @@ import { useChargers } from '@/features/chargers/hooks/useChargers';
 import { useFilterStore } from '@/stores/filterStore';
 import {
   URUGUAY_FALLBACK,
+  getCurrentPosition,
   getLastKnownPosition,
   requestLocationPermission,
 } from '@/lib/location';
@@ -28,14 +29,60 @@ import { LoadingState } from '@/components/molecules/LoadingState';
 import { ErrorState } from '@/components/molecules/ErrorState';
 import { PermissionToast } from '@/components/molecules/PermissionToast';
 import { FiltersSheet } from '@/components/organisms/FiltersSheet';
+import { ChargerPopup } from '@/components/organisms/ChargerPopup';
 import { colors, spacing } from '@/theme';
-import type { Charger } from '@/features/chargers/types';
+import type { ChargerSource, ConnectorInfo, ConnectorType, Currency, MapCharger } from '@/features/chargers/types';
 import type { MapContentProps } from '@/components/organisms/MapContent';
+
+// ── OSRM polyline routing (free, no API key) ─────────────
+const OSRM_BASE = 'https://router.project-osrm.org/route/v1/driving';
+
+interface OSRMRoute {
+  coords: [number, number][]; // [lng, lat] pairs
+  distanceMeters: number;
+}
+
+async function fetchRoute(
+  fromLat: number,
+  fromLng: number,
+  toLat: number,
+  toLng: number,
+): Promise<OSRMRoute | null> {
+  try {
+    const url = `${OSRM_BASE}/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const json = await res.json();
+    const route = json.routes?.[0];
+    if (!route) return null;
+    return {
+      coords: route.geometry?.coordinates ?? [],
+      distanceMeters: route.distance ?? 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ── Selected charger shape (from GeoJSON properties) ─────────
+interface SelectedCharger {
+  id: string;
+  title: string;
+  source: ChargerSource;
+  connectors: ConnectorInfo[];
+  connectorType: ConnectorType;
+  powerKw: number;
+  pricePerHour: number;
+  currency: Currency;
+  lat: number;
+  lng: number;
+  stationStatus?: 'operational' | 'limited' | 'offline';
+}
 
 // ── GeoJSON helpers (no MapLibre dependency) ─────────────────
 type GeoJSONFeature = GeoJSON.Feature<GeoJSON.Point>;
 
-function chargersToGeoJSON(chargers: Charger[]): GeoJSON.FeatureCollection<GeoJSON.Point> {
+function chargersToGeoJSON(chargers: MapCharger[]): GeoJSON.FeatureCollection<GeoJSON.Point> {
   return {
     type: 'FeatureCollection',
     features: chargers.map((c): GeoJSONFeature => ({
@@ -44,9 +91,16 @@ function chargersToGeoJSON(chargers: Charger[]): GeoJSON.FeatureCollection<GeoJS
       properties: {
         id: c.id,
         title: c.title,
-        connector_type: c.connector_type,
-        power_kw: c.power_kw,
+        source: c.source,
+        connectors: c.connectors,
+        connector_type: c.connectors[0]?.type ?? 'tipo_2',
+        power_kw: c.connectors[0]?.power_kw ?? 0,
         status: c.status,
+        price_per_hour_usd: c.price_per_hour_usd ?? 0,
+        currency: c.currency ?? 'USD',
+        lat: c.lat,
+        lng: c.lng,
+        station_status: c.station_status,
       },
     })),
   };
@@ -56,12 +110,19 @@ function chargersToGeoJSON(chargers: Charger[]): GeoJSON.FeatureCollection<GeoJS
 export default function MapTab() {
   const insets = useSafeAreaInsets();
   const filters = useFilterStore((s) => s.filters);
-  const { data, isLoading, error, refetch } = useChargers(filters);
+  const { data, isPlaceholderData, error, refetch } = useChargers(filters);
   const cameraRef = useRef<any>(null);
   const sourceRef = useRef<any>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [selectedCharger, setSelectedCharger] = useState<SelectedCharger | null>(null);
+  const [markerScreenCoords, setMarkerScreenCoords] = useState<{ x: number; y: number } | null>(null);
+  const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
+  const [routeDistanceMeters, setRouteDistanceMeters] = useState<number | null>(null);
   const [showLocationToast, setShowLocationToast] = useState(false);
   const router = useRouter();
+
+  // Cache user position — one GPS fix per session, reused for all route calculations.
+  const userPositionRef = useRef<{ lat: number; lng: number } | null>(null);
 
   // Dynamic import state: we control WHEN MapContent is loaded.
   const [MapComponent, setMapComponent] = useState<React.ComponentType<MapContentProps> | null>(null);
@@ -125,6 +186,10 @@ export default function MapTab() {
       if (result !== 'granted') {
         setShowLocationToast(true);
       }
+      // Pre-cache position for instant route calculation on first tap.
+      getCurrentPosition().then((pos) => {
+        if (pos) userPositionRef.current = pos;
+      });
     });
   }, []);
 
@@ -132,6 +197,34 @@ export default function MapTab() {
     () => (data ? chargersToGeoJSON(data) : null),
     [data],
   );
+
+  // Fetch OSRM route when a charger is selected.
+  useEffect(() => {
+    if (!selectedCharger) {
+      setRouteCoords(null);
+      setRouteDistanceMeters(null);
+      return;
+    }
+    let cancelled = false;
+
+    const getFrom = async (): Promise<{ lat: number; lng: number }> => {
+      if (userPositionRef.current) return userPositionRef.current;
+      const pos = await getCurrentPosition();
+      const from = pos ?? { lat: URUGUAY_FALLBACK.lat, lng: URUGUAY_FALLBACK.lng };
+      if (pos) userPositionRef.current = pos; // cache for next tap
+      return from;
+    };
+
+    getFrom().then(async (from) => {
+      if (cancelled) return;
+      const route = await fetchRoute(from.lat, from.lng, selectedCharger.lat, selectedCharger.lng);
+      if (!cancelled && route) {
+        setRouteCoords(route.coords);
+        setRouteDistanceMeters(route.distanceMeters);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [selectedCharger?.id]);
 
   const handleRecenter = useCallback(async () => {
     const last = await getLastKnownPosition();
@@ -146,22 +239,27 @@ export default function MapTab() {
 
   const handleSourcePress = useCallback(
     async (event: any) => {
-      // @rnmapbox/maps moved features from event.nativeEvent.features
-      // to event.features — handle both for compatibility.
       const feature = event.features?.[0] ?? event.nativeEvent?.features?.[0];
       if (!feature?.properties) return;
       const props = feature.properties as Record<string, unknown> & {
         cluster?: boolean;
         cluster_id?: number;
         id?: string;
+        title?: string;
+        source?: ChargerSource;
+        connectors?: ConnectorInfo[];
+        connector_type?: ConnectorType;
+        power_kw?: number;
+        price_per_hour_usd?: number;
+        currency?: Currency;
+        lat?: number;
+        lng?: number;
+        station_status?: 'operational' | 'limited' | 'offline';
       };
       if (props.cluster && typeof props.cluster_id === 'number' && sourceRef.current) {
-        // @rnmapbox/maps getClusterExpansionZoom crashes on Android
-        // with Gson JsonSyntaxException. Instead, we zoom in by a
-        // fixed increment using the cluster's own coordinates.
         const coords = feature.geometry?.coordinates as [number, number] | undefined;
         if (coords) {
-          const currentZoom = 12; // approximate cluster zoom level
+          const currentZoom = 12;
           cameraRef.current?.setCamera({
             centerCoordinate: coords,
             zoomLevel: currentZoom + 0.5,
@@ -171,18 +269,28 @@ export default function MapTab() {
         }
         return;
       }
-      if (props.id) {
-        router.push(`/charger/${props.id}` as never);
+      if (props.id && props.lat && props.lng) {
+        const connectors = props.connectors ?? [];
+        setSelectedCharger({
+          id: props.id,
+          title: props.title ?? 'Cargador',
+          source: props.source ?? 'enchufate',
+          connectors,
+          connectorType: connectors[0]?.type ?? props.connector_type ?? 'tipo_2',
+          powerKw: connectors[0]?.power_kw ?? props.power_kw ?? 0,
+          pricePerHour: props.price_per_hour_usd ?? 0,
+          currency: props.currency ?? 'USD',
+          lat: props.lat,
+          lng: props.lng,
+          stationStatus: props.station_status,
+        });
       }
     },
-    [router],
+    [],
   );
 
-  // ── Loading / error states ────────────────────────────────
-  if (isLoading) {
-    return <LoadingState label="Cargando cargadores..." />;
-  }
-  if (error) {
+  // ── Error state (only hard errors, not filter refreshes) ────
+  if (error && !geojson) {
     return (
       <ErrorState
         body={error.message || 'No pudimos cargar el mapa. Probá de nuevo.'}
@@ -213,15 +321,49 @@ export default function MapTab() {
     <View style={styles.root}>
       <MapComponent
         geojson={geojson}
+        routeCoords={routeCoords}
+        selectedChargerCoord={selectedCharger ? [selectedCharger.lng, selectedCharger.lat] : null}
         onRecenter={handleRecenter}
         onSourcePress={handleSourcePress}
+        onMarkerScreenCoords={setMarkerScreenCoords}
         insets={insets}
         onFilterPress={() => setSheetOpen(true)}
         cameraRef={cameraRef}
         sourceRef={sourceRef}
+        isRefreshing={isPlaceholderData}
       />
 
       <FiltersSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} />
+
+      {selectedCharger ? (
+        <ChargerPopup
+          title={selectedCharger.title}
+          source={selectedCharger.source}
+          connectors={selectedCharger.connectors}
+          connectorType={selectedCharger.connectorType}
+          powerKw={selectedCharger.powerKw}
+          pricePerHour={selectedCharger.pricePerHour}
+          currency={selectedCharger.currency}
+          lat={selectedCharger.lat}
+          lng={selectedCharger.lng}
+          position={markerScreenCoords}
+          routeDistanceMeters={routeDistanceMeters}
+          onPressDetail={() => {
+            const id = selectedCharger.id;
+            setSelectedCharger(null);
+            setMarkerScreenCoords(null);
+            setRouteCoords(null);
+            setRouteDistanceMeters(null);
+            router.push(`/charger/${id}` as never);
+          }}
+          onDismiss={() => {
+            setSelectedCharger(null);
+            setMarkerScreenCoords(null);
+            setRouteCoords(null);
+            setRouteDistanceMeters(null);
+          }}
+        />
+      ) : null}
 
       <PermissionToast
         visible={showLocationToast}
