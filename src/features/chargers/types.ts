@@ -18,10 +18,43 @@
  * means "always available (24/7)" by convention.
  */
 
-export type ConnectorType = 'tipo_1' | 'tipo_2' | 'ccs' | 'chademo' | 'tesla';
+export type ConnectorType = 'tipo_1' | 'tipo_2' | 'ccs' | 'chademo' | 'tesla' | 'gb_t';
 export type ChargerStatus = 'active' | 'paused';
 export type MinReservationMinutes = 30 | 60 | 120 | 240 | 480;
 export type Currency = 'USD' | 'UYU' | 'ARS';
+
+export type ChargerSource = 'enchufate' | 'ute';
+
+export interface ConnectorInfo {
+  type: ConnectorType;
+  power_kw: number;
+  count: number;
+  status?: 'available' | 'occupied' | 'out_of_service';
+}
+
+/**
+ * MapCharger — normalized display type that normalizes both
+ * Supabase Charger records and UTE API stations into one shape
+ * the map renders.
+ */
+export interface MapCharger {
+  id: string;
+  source: ChargerSource;
+  title: string;
+  address: string;
+  city?: string;
+  department?: string;
+  lat: number;
+  lng: number;
+  connectors: ConnectorInfo[];
+  // P2P-only fields (undefined for UTE)
+  price_per_hour_usd?: number;
+  currency?: Currency;
+  status?: ChargerStatus;
+  owner_id?: string;
+  // Populated when source='ute' for connector-list display
+  station_status?: 'operational' | 'limited' | 'offline';
+}
 
 export type DayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
@@ -64,4 +97,5 @@ export const CONNECTOR_LABEL: Record<ConnectorType, string> = {
   ccs: 'CCS',
   chademo: 'CHAdeMO',
   tesla: 'Tesla',
+  gb_t: 'GB/T',
 };
