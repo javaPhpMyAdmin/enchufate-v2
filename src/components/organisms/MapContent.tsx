@@ -9,8 +9,8 @@
  * dynamic imports (map.tsx → MapContent → @rnmapbox/maps) cause
  * Metro "unknown module" errors.
  */
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import type { NativeSyntheticEvent } from 'react-native';
 import { SlidersHorizontal } from 'lucide-react-native';
@@ -23,6 +23,7 @@ import { colors, radius, shadows, spacing, typography } from '@/theme';
 // ── Constants ────────────────────────────────────────────────
 const MAPBOX_STYLE = MapboxGL.StyleURL.Street;
 const CARGADOR_ICON_ID = 'cargador';
+const UTE_MARKER_ICON_ID = 'ute-marker';
 
 // Inicializa el token público (el que empieza con pk.)
 MapboxGL.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN || '');
@@ -43,41 +44,147 @@ export type ChargerFC = import('geojson').FeatureCollection<
 // ── Props ────────────────────────────────────────────────────
 export interface MapContentProps {
   geojson: ChargerFC | null;
+  routeCoords?: [number, number][] | null;
+  selectedChargerCoord?: [number, number] | null; // [lng, lat] for repositioning after fitBounds
   onRecenter: () => void;
   onSourcePress: (event: any) => void;
+  onMarkerScreenCoords?: (coords: { x: number; y: number } | null) => void;
   insets: { top: number; bottom: number };
   onFilterPress: () => void;
   cameraRef: React.RefObject<any>;
   sourceRef: React.RefObject<any>;
+  isRefreshing?: boolean;
 }
 
 // ── Component ────────────────────────────────────────────────
 export default function MapContent({
   geojson,
+  routeCoords,
+  selectedChargerCoord,
   onRecenter,
   onSourcePress,
+  onMarkerScreenCoords,
   insets,
   onFilterPress,
   cameraRef,
   sourceRef,
+  isRefreshing = false,
 }: MapContentProps) {
+  const mapViewRef = useRef<MapboxGL.MapView>(null);
+  const barWidth = useRef(new Animated.Value(0)).current;
+
+  // Stable empty shape — never changes, so the ShapeSource never unmounts.
+  const EMPTY_FEATURE: GeoJSON.Feature = {
+    type: 'Feature',
+    properties: {},
+    geometry: { type: 'Point', coordinates: [0, 0] },
+  };
+
+  // Memoize route GeoJSON — only changes when routeCoords actually changes.
+  const routeGeoJSON = useMemo(() => {
+    if (!routeCoords || routeCoords.length < 2) return EMPTY_FEATURE;
+    return {
+      type: 'Feature' as const,
+      properties: {},
+      geometry: {
+        type: 'LineString' as const,
+        coordinates: routeCoords,
+      },
+    };
+  }, [routeCoords]);
+
+  // Fit camera to route bounds + reposition card after animation.
+  useEffect(() => {
+    if (!routeCoords || routeCoords.length < 2 || !cameraRef.current) return;
+    const lngs = routeCoords.map((c) => c[0]);
+    const lats = routeCoords.map((c) => c[1]);
+    const ne: [number, number] = [Math.max(...lngs), Math.max(...lats)];
+    const sw: [number, number] = [Math.min(...lngs), Math.min(...lats)];
+    cameraRef.current.setCamera({
+      bounds: { ne, sw, padding: 120 },
+      animationMode: 'easeTo',
+      animationDuration: 600,
+    });
+
+    // After zoom animation, recalculate marker screen position so the card
+    // stays above the marker at its new screen location.
+    if (selectedChargerCoord && onMarkerScreenCoords && mapViewRef.current) {
+      const timer = setTimeout(() => {
+        mapViewRef.current?.getPointInView(selectedChargerCoord).then(
+          (point: number[] | null) => {
+            if (point && point[0] != null && point[1] != null) {
+              onMarkerScreenCoords({ x: point[0], y: point[1] });
+            }
+          },
+        );
+      }, 650); // slightly after animation completes
+      return () => clearTimeout(timer);
+    }
+  }, [routeCoords, cameraRef, selectedChargerCoord, onMarkerScreenCoords]);
+
+  useEffect(() => {
+    if (isRefreshing) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(barWidth, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: false,
+          }),
+          Animated.timing(barWidth, {
+            toValue: 0,
+            duration: 400,
+            useNativeDriver: false,
+          }),
+        ]),
+      );
+      loop.start();
+      return () => loop.stop();
+    } else {
+      barWidth.setValue(0);
+    }
+  }, [isRefreshing, barWidth]);
+
+  // Convert marker coords → screen position for the popup card.
+  const handleShapePress = useCallback(
+    async (event: any) => {
+      const feature = event.features?.[0] ?? event.nativeEvent?.features?.[0];
+      const coords = feature?.geometry?.coordinates as [number, number] | undefined;
+      if (coords && onMarkerScreenCoords && mapViewRef.current) {
+        const point = await mapViewRef.current.getPointInView(coords);
+        if (point) {
+          onMarkerScreenCoords({ x: point[0], y: point[1] });
+        }
+      } else if (onMarkerScreenCoords) {
+        onMarkerScreenCoords(null);
+      }
+      onSourcePress(event);
+    },
+    [onSourcePress, onMarkerScreenCoords],
+  );
+
   return (
     <View style={styles.root}>
       <MapboxGL.MapView
+        ref={mapViewRef}
         style={StyleSheet.absoluteFill}
         styleURL={MAPBOX_STYLE}
         logoEnabled={false}
         attributionEnabled={false}
+        compassEnabled={false}
+        scaleBarEnabled={false}
       >
         <MapboxGL.Camera
           ref={cameraRef}
           centerCoordinate={INITIAL_CAMERA.centerCoordinate}
           zoomLevel={INITIAL_CAMERA.zoomLevel}
           animationDuration={0}
+          padding={{ paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: 0, paddingRight: 0 }}
         />
         <MapboxGL.Images
           images={{
             [CARGADOR_ICON_ID]: require('@/../assets/icons/cargador.png'),
+            [UTE_MARKER_ICON_ID]: require('@/../assets/icons/ute-marker.png'),
           }}
         />
         {geojson ? (
@@ -88,7 +195,7 @@ export default function MapContent({
             cluster
             clusterRadius={50}
             clusterMaxZoomLevel={14}
-            onPress={onSourcePress}
+            onPress={handleShapePress}
           >
             {/* Cluster bubble (rendered at zoom < 14). */}
             <MapboxGL.CircleLayer
@@ -119,10 +226,10 @@ export default function MapContent({
                 textColor: colors.textOnPrimary,
               }}
             />
-            {/* Individual charger pin (zoom >= 14). */}
+            {/* Individual P2P charger pin (zoom >= 14, source=enchufate). */}
             <MapboxGL.SymbolLayer
               id="charger-pin"
-              filter={['!', ['has', 'point_count']]}
+              filter={['all', ['!', ['has', 'point_count']], ['==', 'source', 'enchufate']]}
               style={{
                 iconImage: CARGADOR_ICON_ID,
                 iconSize: 0.12,
@@ -130,9 +237,54 @@ export default function MapContent({
                 iconAllowOverlap: true,
               }}
             />
+            {/* Individual UTE charger pin (zoom >= 14, source=ute). */}
+            <MapboxGL.SymbolLayer
+              id="ute-pin"
+              filter={['all', ['!', ['has', 'point_count']], ['==', 'source', 'ute']]}
+              style={{
+                iconImage: UTE_MARKER_ICON_ID,
+                iconSize: 1,
+                iconAnchor: 'bottom',
+                iconAllowOverlap: true,
+              }}
+            />
           </MapboxGL.ShapeSource>
         ) : null}
+
+        {/* Route polyline (OSRM) — always mounted to prevent flicker on zoom. */}
+        <MapboxGL.ShapeSource
+          id="route-source"
+          shape={routeGeoJSON}
+        >
+          <MapboxGL.LineLayer
+            id="route-line"
+            style={{
+              lineColor: colors.primary,
+              lineWidth: 4,
+              lineCap: 'round',
+              lineJoin: 'round',
+              lineOpacity: routeCoords && routeCoords.length > 1 ? 1 : 0,
+            }}
+          />
+        </MapboxGL.ShapeSource>
       </MapboxGL.MapView>
+
+      {/* Loading bar — thin animated indicator during filter refreshes. */}
+      {isRefreshing ? (
+        <View style={[styles.loadingBarTrack, { top: insets.top }]}>
+          <Animated.View
+            style={[
+              styles.loadingBarFill,
+              {
+                width: barWidth.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0%', '100%'],
+                }),
+              },
+            ]}
+          />
+        </View>
+      ) : null}
 
       {/* Filtros pill — top-left, above the safe area. */}
       <Pressable
@@ -217,5 +369,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radius.button,
+  },
+  loadingBarTrack: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    zIndex: 20,
+  },
+  loadingBarFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 1.5,
   },
 });
