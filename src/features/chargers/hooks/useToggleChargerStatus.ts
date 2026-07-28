@@ -31,6 +31,7 @@ import type { ChargerStatus } from '../types';
 /* ------------------------------------------------------------------ */
 
 export interface UseToggleChargerStatusResult {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   toggle: (args: { chargerId: string; currentStatus: ChargerStatus }) => Promise<void>;
   isPending: boolean;
   error: AppError | null;

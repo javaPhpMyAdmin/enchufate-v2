@@ -190,9 +190,10 @@ export function ChargerPopup({
             const current = connectorCurrent(conn.type);
             const speed = connectorSpeedLabel(conn.power_kw);
             const cableLabel = conn.has_cable ? 'Con cable' : 'Sin cable';
-            const statusLabel = conn.status === 'available'
-              ? 'Disponible'
-              : conn.status === 'occupied'
+            const statusLabel =
+              conn.status === 'available'
+                ? 'Disponible'
+                : conn.status === 'occupied'
                 ? 'Ocupado'
                 : null;
             return (
@@ -266,7 +267,7 @@ export function ChargerPopup({
         </View>
         {source === 'enchufate' && (
           <Pressable style={styles.verButton} onPress={onPressDetail}>
-            <Text style={styles.verButtonText}>Ver</Text>
+            <Text style={styles.verButtonText}>Ver Detalles</Text>
           </Pressable>
         )}
       </View>
