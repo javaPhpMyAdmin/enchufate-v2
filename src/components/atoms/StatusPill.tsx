@@ -6,6 +6,7 @@ import { colors, radius, spacing, typography } from '@/theme';
 export type StatusPillKind =
   | 'solicitada'
   | 'confirmada'
+  | 'en_curso'
   | 'cancelada'
   | 'completada'
   | 'disponible'
@@ -19,6 +20,7 @@ export interface StatusPillProps {
 const MAP: Record<StatusPillKind, { label: string; bg: string; fg: string; dot: string }> = {
   solicitada: { label: 'Solicitada', bg: colors.background, fg: colors.textPrimary, dot: colors.textSecondary },
   confirmada: { label: 'Confirmada', bg: colors.successSurface, fg: colors.success, dot: colors.success },
+  en_curso: { label: 'En curso', bg: colors.charging, fg: colors.textOnPrimary, dot: colors.textOnPrimary },
   cancelada: { label: 'Cancelada', bg: colors.dangerSurface, fg: colors.danger, dot: colors.danger },
   completada: { label: 'Completada', bg: colors.successSurface, fg: colors.success, dot: colors.success },
   disponible: { label: 'Disponible', bg: colors.successSurface, fg: colors.success, dot: colors.success },

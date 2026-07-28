@@ -33,12 +33,13 @@
 export type ReservationStatus =
   | 'solicitada'
   | 'confirmada'
+  | 'en_curso'
   | 'cancelada'
   | 'completada';
 
 export type ReservationActor = 'renter' | 'host' | 'system';
 
-export type ReservationAction = 'confirm' | 'cancel' | 'complete';
+export type ReservationAction = 'confirm' | 'cancel' | 'complete' | 'start_charging' | 'end_charging';
 
 interface Transition {
   from: ReservationStatus;
@@ -60,9 +61,15 @@ export const TRANSITIONS: readonly Transition[] = [
   { from: 'solicitada', to: 'confirmada', by: 'host' },
   { from: 'solicitada', to: 'cancelada', by: 'renter' },
   { from: 'solicitada', to: 'cancelada', by: 'host' },
+  { from: 'confirmada', to: 'en_curso', by: 'host' },
   { from: 'confirmada', to: 'cancelada', by: 'renter' },
   { from: 'confirmada', to: 'cancelada', by: 'host' },
   { from: 'confirmada', to: 'completada', by: 'system' },
+  { from: 'en_curso', to: 'completada', by: 'host' },
+  { from: 'en_curso', to: 'completada', by: 'renter' },
+  { from: 'en_curso', to: 'cancelada', by: 'renter' },
+  { from: 'en_curso', to: 'cancelada', by: 'host' },
+  { from: 'en_curso', to: 'completada', by: 'system' },
 ];
 
 /**
@@ -104,6 +111,12 @@ export function nextStatus(
     // transition end-to-end.
     return canTransition(from, 'completada', by) ? 'completada' : null;
   }
+  if (action === 'start_charging') {
+    return canTransition(from, 'en_curso', by) ? 'en_curso' : null;
+  }
+  if (action === 'end_charging') {
+    return canTransition(from, 'completada', by) ? 'completada' : null;
+  }
   return null;
 }
 
@@ -117,5 +130,5 @@ export function nextStatus(
  * change.
  */
 export function isCancellable(status: ReservationStatus): boolean {
-  return status === 'solicitada' || status === 'confirmada';
+  return status === 'solicitada' || status === 'confirmada' || status === 'en_curso';
 }
