@@ -147,6 +147,7 @@ export function useReservation(
         start_at: data.start_at,
         end_at: data.end_at,
         horario_a_coordinar: data.horario_a_coordinar,
+        charging_started_at: (data as any).charging_started_at ?? null,
         status: data.status,
         created_at: data.created_at,
         updated_at: data.updated_at,

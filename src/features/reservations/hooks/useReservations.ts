@@ -237,6 +237,7 @@ export function useReservations(
           start_at: r.start_at,
           end_at: r.end_at,
           horario_a_coordinar: r.horario_a_coordinar,
+          charging_started_at: r.charging_started_at ?? null,
           status: r.status,
           created_at: r.created_at,
           updated_at: r.updated_at,
