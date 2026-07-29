@@ -35,7 +35,7 @@ import { LoadingState } from '@/components/molecules/LoadingState';
 import { ErrorState } from '@/components/molecules/ErrorState';
 import { PermissionToast } from '@/components/molecules/PermissionToast';
 import { FiltersSheet } from '@/components/organisms/FiltersSheet';
-import { ChargerPopup } from '@/components/organisms/ChargerPopup';
+import { ChargerBottomSheet } from '@/components/organisms/ChargerBottomSheet';
 import { colors } from '@/theme';
 
 import type {
@@ -136,10 +136,7 @@ export default function MapTab() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedCharger, setSelectedCharger] =
     useState<SelectedCharger | null>(null);
-  const [markerScreenCoords, setMarkerScreenCoords] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
+  const [showChargerSheet, setShowChargerSheet] = useState(false);
   const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(
     null,
   );
@@ -151,6 +148,10 @@ export default function MapTab() {
 
   // Cache user position — one GPS fix per session, reused for all route calculations.
   const userPositionRef = useRef<{ lat: number; lng: number } | null>(null);
+
+  // Track selected id across renders so handleSourcePress can detect same-pin taps.
+  const selectedIdRef = useRef<string | null>(null);
+  selectedIdRef.current = selectedCharger?.id ?? null;
 
   // Dynamic import state: we control WHEN MapContent is loaded.
   const [MapComponent, setMapComponent] =
@@ -230,6 +231,7 @@ export default function MapTab() {
   // Fetch OSRM route when a charger is selected.
   useEffect(() => {
     if (!selectedCharger) return; // Keep existing route visible when popup dismisses.
+
     let cancelled = false;
 
     const getFrom = async (): Promise<{ lat: number; lng: number }> => {
@@ -275,9 +277,9 @@ export default function MapTab() {
     });
     // Clear route and selection when recentering.
     setSelectedCharger(null);
-    setMarkerScreenCoords(null);
     setRouteCoords(null);
     setRouteDistanceMeters(null);
+    setShowChargerSheet(false);
   }, []);
 
   const handleSourcePress = useCallback(async (event: any) => {
@@ -319,6 +321,14 @@ export default function MapTab() {
       return;
     }
     if (props.id && props.lat && props.lng) {
+      // Same pin tapped again → dismiss everything
+      if (props.id === selectedIdRef.current) {
+        setSelectedCharger(null);
+        setShowChargerSheet(false);
+        setRouteCoords(null);
+        setRouteDistanceMeters(null);
+        return;
+      }
       const connectors = props.connectors ?? [];
       setSelectedCharger({
         id: props.id,
@@ -335,6 +345,29 @@ export default function MapTab() {
         current_charging_since: props.current_charging_since,
       });
     }
+  }, []);
+
+  const handleCalloutPress = useCallback(() => {
+    setShowChargerSheet(true);
+  }, []);
+
+  const handleChargerDetail = useCallback(() => {
+    if (!selectedCharger) return;
+    const id = selectedCharger.id;
+    setSelectedCharger(null);
+    setShowChargerSheet(false);
+    setRouteCoords(null);
+    setRouteDistanceMeters(null);
+    router.push(`/charger/${id}` as never);
+  }, [selectedCharger, router]);
+
+  const handleChargerDismiss = useCallback(() => {
+    setShowChargerSheet(false);
+  }, []);
+
+  const handleMapPress = useCallback(() => {
+    // Solo oculta el callout — la ruta se mantiene visible
+    setShowChargerSheet(false);
   }, []);
 
   // ── Error state (only hard errors, not filter refreshes) ────
@@ -370,14 +403,13 @@ export default function MapTab() {
       <MapComponent
         geojson={geojson}
         routeCoords={routeCoords}
-        selectedChargerCoord={
-          selectedCharger ? [selectedCharger.lng, selectedCharger.lat] : null
-        }
+        selectedCharger={selectedCharger}
         onRecenter={handleRecenter}
         onSourcePress={handleSourcePress}
-        onMarkerScreenCoords={setMarkerScreenCoords}
         insets={insets}
         onFilterPress={() => setSheetOpen(true)}
+        onCalloutPress={handleCalloutPress}
+        onMapPress={handleMapPress}
         cameraRef={cameraRef}
         sourceRef={sourceRef}
         isRefreshing={isPlaceholderData}
@@ -385,37 +417,23 @@ export default function MapTab() {
 
       <FiltersSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} />
 
-      {selectedCharger ? (
-        <ChargerPopup
-          title={selectedCharger.title}
-          source={selectedCharger.source}
-          connectors={selectedCharger.connectors}
-          connectorType={selectedCharger.connectorType}
-          powerKw={selectedCharger.powerKw}
-          pricePerHour={selectedCharger.pricePerHour}
-          currency={selectedCharger.currency}
-          lat={selectedCharger.lat}
-          lng={selectedCharger.lng}
-          position={markerScreenCoords}
-          routeDistanceMeters={routeDistanceMeters}
-          stationStatus={selectedCharger.stationStatus}
-          charging_since={selectedCharger.current_charging_since}
-          onPressDetail={() => {
-            const id = selectedCharger.id;
-            setSelectedCharger(null);
-            setMarkerScreenCoords(null);
-            setRouteCoords(null);
-            setRouteDistanceMeters(null);
-            router.push(`/charger/${id}` as never);
-          }}
-          onDismiss={() => {
-            setSelectedCharger(null);
-            setMarkerScreenCoords(null);
-            setRouteCoords(null);
-            setRouteDistanceMeters(null);
-          }}
-        />
-      ) : null}
+      <ChargerBottomSheet
+        visible={showChargerSheet}
+        title={selectedCharger?.title ?? ''}
+        source={selectedCharger?.source ?? 'enchufate'}
+        connectors={selectedCharger?.connectors ?? []}
+        connectorType={selectedCharger?.connectorType ?? 'tipo_2'}
+        powerKw={selectedCharger?.powerKw ?? 0}
+        pricePerHour={selectedCharger?.pricePerHour ?? 0}
+        currency={selectedCharger?.currency ?? 'USD'}
+        lat={selectedCharger?.lat ?? 0}
+        lng={selectedCharger?.lng ?? 0}
+        routeDistanceMeters={routeDistanceMeters}
+        stationStatus={selectedCharger?.stationStatus}
+        charging_since={selectedCharger?.current_charging_since}
+        onPressDetail={handleChargerDetail}
+        onDismiss={handleChargerDismiss}
+      />
 
       <PermissionToast
         visible={showLocationToast}

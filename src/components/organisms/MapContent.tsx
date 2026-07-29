@@ -12,11 +12,12 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
-// import type { NativeSyntheticEvent } from 'react-native';
+import type { EdgeInsets } from 'react-native-safe-area-context';
 import { SlidersHorizontal } from 'lucide-react-native';
 
 import { FAB } from '@/components/atoms/FAB';
 import { Icon } from '@/components/atoms/Icon';
+import { ChargerCallout } from '@/components/organisms/ChargerCallout';
 import { URUGUAY_FALLBACK } from '@/lib/location';
 import { colors, radius, spacing, typography } from '@/theme';
 import Mapbox from '@rnmapbox/maps';
@@ -25,7 +26,6 @@ import Mapbox from '@rnmapbox/maps';
 const MAPBOX_STYLE = MapboxGL.StyleURL.Street;
 const CARGADOR_ICON_ID = 'cargador';
 
-// Inicializa el token público (el que empieza con pk.)
 MapboxGL.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN || '');
 
 const INITIAL_CAMERA = {
@@ -43,14 +43,23 @@ export type ChargerFC = import('geojson').FeatureCollection<
 
 // ── Props ────────────────────────────────────────────────────
 export interface MapContentProps {
-  geojson: ChargerFC | null;
+  geojson: GeoJSON.FeatureCollection | null;
   routeCoords?: [number, number][] | null;
-  selectedChargerCoord?: [number, number] | null; // [lng, lat] for repositioning after fitBounds
+  /** Full selected-charger object — used to render the MarkerView callout. */
+  selectedCharger?: {
+    id: string;
+    title: string;
+    lat: number;
+    lng: number;
+  } | null;
   onRecenter: () => void;
   onSourcePress: (event: any) => void;
-  onMarkerScreenCoords?: (coords: { x: number; y: number } | null) => void;
-  insets: { top: number; bottom: number };
+  insets: EdgeInsets;
   onFilterPress: () => void;
+  /** Fires when the floating callout badge is tapped. */
+  onCalloutPress: () => void;
+  /** Fires when the map background is tapped (not on a pin). */
+  onMapPress?: () => void;
   cameraRef: React.RefObject<any>;
   sourceRef: React.RefObject<any>;
   isRefreshing?: boolean;
@@ -60,12 +69,13 @@ export interface MapContentProps {
 export default function MapContent({
   geojson,
   routeCoords,
-  selectedChargerCoord,
+  selectedCharger,
   onRecenter,
   onSourcePress,
-  onMarkerScreenCoords,
   insets,
   onFilterPress,
+  onCalloutPress,
+  onMapPress,
   cameraRef,
   sourceRef,
   isRefreshing = false,
@@ -93,7 +103,7 @@ export default function MapContent({
     };
   }, [routeCoords]);
 
-  // Fit camera to route bounds + reposition card after animation.
+  // Fit camera to route bounds.
   useEffect(() => {
     if (!routeCoords || routeCoords.length < 2 || !cameraRef.current) return;
     const lngs = routeCoords.map((c) => c[0]);
@@ -121,22 +131,7 @@ export default function MapContent({
       animationMode: 'easeTo',
       animationDuration: 600,
     });
-
-    // After zoom animation, recalculate marker screen position so the card
-    // stays above the marker at its new screen location.
-    if (selectedChargerCoord && onMarkerScreenCoords && mapViewRef.current) {
-      const timer = setTimeout(() => {
-        mapViewRef.current
-          ?.getPointInView(selectedChargerCoord)
-          .then((point: number[] | null) => {
-            if (point && point[0] != null && point[1] != null) {
-              onMarkerScreenCoords({ x: point[0], y: point[1] });
-            }
-          });
-      }, 650); // slightly after animation completes
-      return () => clearTimeout(timer);
-    }
-  }, [routeCoords, cameraRef, selectedChargerCoord, onMarkerScreenCoords]);
+  }, [routeCoords, cameraRef]);
 
   useEffect(() => {
     if (isRefreshing) {
@@ -161,24 +156,11 @@ export default function MapContent({
     }
   }, [isRefreshing, barWidth]);
 
-  // Convert marker coords → screen position for the popup card.
   const handleShapePress = useCallback(
     async (event: any) => {
-      const feature = event.features?.[0] ?? event.nativeEvent?.features?.[0];
-      const coords = feature?.geometry?.coordinates as
-        | [number, number]
-        | undefined;
-      if (coords && onMarkerScreenCoords && mapViewRef.current) {
-        const point = await mapViewRef.current.getPointInView(coords);
-        if (point) {
-          onMarkerScreenCoords({ x: point[0], y: point[1] });
-        }
-      } else if (onMarkerScreenCoords) {
-        onMarkerScreenCoords(null);
-      }
       onSourcePress(event);
     },
-    [onSourcePress, onMarkerScreenCoords],
+    [onSourcePress],
   );
 
   return (
@@ -191,6 +173,7 @@ export default function MapContent({
         attributionEnabled={false}
         compassEnabled={false}
         scaleBarEnabled={false}
+        onPress={onMapPress}
       >
         <MapboxGL.Camera
           ref={cameraRef}
@@ -266,8 +249,7 @@ export default function MapContent({
                 iconAllowOverlap: true,
               }}
             />
-            {/* Orange charging pin (source=enchufate, actively charging).
-                Orange circle + lightning bolt overlaid. */}
+            {/* Orange charging pin (source=enchufate, actively charging). */}
             <MapboxGL.CircleLayer
               id="charger-pin-charging-bg"
               filter={[
@@ -381,6 +363,22 @@ export default function MapContent({
             }}
           />
         </MapboxGL.ShapeSource>
+
+        {/* Callout badge anchored to the selected charger pin.
+            MarkerView moves naturally with the map — no gesture hacks needed. */}
+        {selectedCharger && (
+          <MapboxGL.MarkerView
+            coordinate={[selectedCharger.lng, selectedCharger.lat]}
+            anchor={{ x: 0.5, y: 1.12 }}
+          >
+            <ChargerCallout
+              // title={selectedCharger.title}
+              title="Ver"
+              onPress={onCalloutPress}
+            />
+          </MapboxGL.MarkerView>
+        )}
+
         <Mapbox.UserLocation
           animated={true}
           androidRenderMode={'gps'}

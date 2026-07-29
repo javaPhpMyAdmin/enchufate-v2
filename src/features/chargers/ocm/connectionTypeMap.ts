@@ -19,7 +19,8 @@ import type { ConnectorType } from '../types';
  * | 1      | tipo_1        |
  * | 27, 30 | tesla         |
  * | 2, 1039 | chademo      |
- * | 1040   | gb_t          |
+ * | 1040, 1038 | gb_t    |
+ * | 28     | tipo_2       |
  * | 0      | tipo_2 (silent — Unknown) |
  * | other  | tipo_2 (warn) |
  */
@@ -31,7 +32,9 @@ export const OCM_CONNECTOR_MAP: Record<number, ConnectorType> = {
   30: 'tesla',
   32: 'ccs',
   33: 'ccs',
+  28: 'tipo_2',    // CEE 7/4 Schuko (European domestic plug, slow AC)
   1036: 'tipo_2',
+  1038: 'gb_t',    // GB/T 20234.2 AC (Chinese standard)
   1039: 'chademo',
   1040: 'gb_t',
 };

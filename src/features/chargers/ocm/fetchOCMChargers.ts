@@ -1,8 +1,12 @@
 /**
- * OCM API client — fetches and normalizes Open Charge Map Uruguay POIs
- * into MapCharger[].
+ * OCM API client — fetches and normalizes Open Charge Map POIs
+ * (Uruguay + Argentina) into MapCharger[].
  *
- * Endpoint: https://api.openchargemap.io/v3/poi/?countrycode=UY&key=...
+ * Makes two parallel requests (UY + AR) because OCM's `countrycode`
+ * parameter does NOT accept comma-separated values (unlike `operatorid`
+ * and `connectiontypeid`).
+ *
+ * Endpoint: https://api.openchargemap.io/v3/poi/?countrycode=XX&key=...
  * Auth: API key via `process.env.EXPO_PUBLIC_OCM_API_KEY`.
  *
  * **API key setup**: The user must set `EXPO_PUBLIC_OCM_API_KEY` in
@@ -48,10 +52,11 @@ interface OCMPOI {
   StatusTypeID?: number;
 }
 
-// ── Endpoint ────────────────────────────────────────────────
+// ── Country list ────────────────────────────────────────────
 
-const OCM_ENDPOINT =
-  'https://api.openchargemap.io/v3/poi/?countrycode=UY' as const;
+const OCM_COUNTRIES = ['UY', 'AR'] as const;
+
+const OCM_BASE_URL = 'https://api.openchargemap.io/v3/poi/' as const;
 
 // ── Helper: infer has_cable from ConnectionTypeID ──────────
 
@@ -129,17 +134,60 @@ function normalizeOCMStation(poi: OCMPOI): MapCharger | null {
   };
 }
 
-// ── Fetch ────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────
 
 /**
- * Fetch all Uruguay OCM charging POIs and normalize to MapCharger[].
+ * Fetch OCM POIs for a single country code.
+ * Returns raw parsed array, or throws on non-2xx / Cloudflare block.
+ */
+async function fetchCountry(country: string, apiKey: string): Promise<OCMPOI[]> {
+  const url = `${OCM_BASE_URL}?countrycode=${country}&key=${apiKey}`;
+
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Enchufate/2.0 (Uruguay; +https://enchufate.uy)',
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`OCM API error (${country}): ${res.status} ${res.statusText}`);
+  }
+
+  const contentType = res.headers.get('content-type') ?? '';
+  if (contentType.includes('text/html')) {
+    throw new Error(
+      `OCM returned HTML for ${country} (Cloudflare block)`,
+    );
+  }
+
+  const json: unknown = await res.json();
+
+  if (!Array.isArray(json)) {
+    console.warn(
+      `[OCM] Unexpected response shape for ${country} — expected flat array, got`,
+      typeof json,
+    );
+    return [];
+  }
+
+  return json as OCMPOI[];
+}
+
+// ── Public API ──────────────────────────────────────────────
+
+/**
+ * Fetch OCM charging POIs for Uruguay + Argentina and normalize to MapCharger[].
+ *
+ * Makes two parallel requests (one per country) because OCM's `countrycode`
+ * parameter does not support comma-separated values. On partial failure,
+ * the failing country returns [] so the other country still loads.
  *
  * Uses `process.env.EXPO_PUBLIC_OCM_API_KEY` for the API key.
  * The request includes a `User-Agent` header — OCM (or Cloudflare
  * in front of it) blocks requests without one.
  *
- * On any failure (network, non-2xx, HTML response, parse error),
- * returns an empty array — the caller should degrade gracefully.
+ * On complete failure, returns an empty array — the caller should
+ * degrade gracefully.
  */
 export async function fetchOCMChargers(): Promise<MapCharger[]> {
   const apiKey = process.env.EXPO_PUBLIC_OCM_API_KEY;
@@ -152,42 +200,25 @@ export async function fetchOCMChargers(): Promise<MapCharger[]> {
     return [];
   }
 
-  const url = `${OCM_ENDPOINT}&key=${apiKey}`;
+  // Fire both country requests in parallel.
+  const results = await Promise.allSettled(
+    OCM_COUNTRIES.map((cc) => fetchCountry(cc, apiKey)),
+  );
 
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Enchufate/2.0 (Uruguay; +https://enchufate.uy)',
-    },
-  });
+  const allPois: OCMPOI[] = [];
 
-  // Reject non-2xx status.
-  if (!res.ok) {
-    throw new Error(`OCM API error: ${res.status} ${res.statusText}`);
+  for (const [i, r] of results.entries()) {
+    if (r.status === 'fulfilled') {
+      allPois.push(...r.value);
+    } else {
+      const reason = r.reason;
+      console.warn(
+        `[OCM] Failed to fetch ${OCM_COUNTRIES[i]}: ${reason instanceof Error ? reason.message : String(reason)}`,
+      );
+    }
   }
 
-  // Detect Cloudflare HTML block before attempting JSON parse.
-  const contentType = res.headers.get('content-type') ?? '';
-  if (contentType.includes('text/html')) {
-    throw new Error(
-      'OCM returned HTML (Cloudflare block) — request was blocked before reaching the API',
-    );
-  }
-
-  // Parse JSON — let this throw naturally on malformed responses.
-  const json: unknown = await res.json();
-
-  // Defensive: warn if the API shape changed unexpectedly.
-  if (!Array.isArray(json)) {
-    console.warn(
-      '[OCM] Unexpected response shape — expected flat array, got',
-      typeof json,
-    );
-    return [];
-  }
-
-  const pois = json as OCMPOI[];
-
-  const chargers = pois
+  const chargers = allPois
     .map(normalizeOCMStation)
     .filter((c): c is MapCharger => c !== null);
 
