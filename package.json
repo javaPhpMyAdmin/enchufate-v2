@@ -16,9 +16,12 @@
     "android:local": "ANDROID_HOME=$HOME/Library/Android/sdk npx expo run:android"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
     "@gorhom/bottom-sheet": "^5",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/datetimepicker": "^8.4.4",
+    "@react-native-vector-icons/get-image": "^13.0.0",
+    "@react-native-vector-icons/material-design-icons": "^13.1.2",
     "@rnmapbox/maps": "^10.3.2",
     "@supabase/supabase-js": "^2.110.2",
     "@tanstack/query-async-storage-persister": "^5.101.2",

@@ -25,6 +25,7 @@ export const colors = {
 
   // Surfaces + borders
   surface: '#FFFFFF',
+  surfaceWarm: '#FFF8F0',
   background: '#FAFAFA',
   border: '#E5E7EB',
 

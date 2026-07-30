@@ -59,7 +59,8 @@
       "@rnmapbox/maps",
       "@react-native-community/datetimepicker",
       "expo-web-browser",
-      "expo-asset"
+      "expo-asset",
+      "@react-native-vector-icons/material-design-icons"
     ],
     "experiments": {
       "typedRoutes": true

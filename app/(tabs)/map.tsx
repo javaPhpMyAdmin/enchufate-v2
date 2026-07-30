@@ -20,7 +20,7 @@ import React, {
   useState,
 } from 'react';
 import { InteractionManager, Linking, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useChargers } from '@/features/chargers/hooks/useChargers';
@@ -53,6 +53,7 @@ const OSRM_BASE = 'https://router.project-osrm.org/route/v1/driving';
 interface OSRMRoute {
   coords: [number, number][]; // [lng, lat] pairs
   distanceMeters: number;
+  duration: number;
 }
 
 async function fetchRoute(
@@ -66,11 +67,13 @@ async function fetchRoute(
     const res = await fetch(url);
     if (!res.ok) return null;
     const json = await res.json();
+    console.log('[fetchRoute] OSRM RESULT:', JSON.stringify(json, null, 2));
     const route = json.routes?.[0];
     if (!route) return null;
     return {
       coords: route.geometry?.coordinates ?? [],
       distanceMeters: route.distance ?? 0,
+      duration: route.duration ?? 0,
     };
   } catch {
     return null;
@@ -143,6 +146,8 @@ export default function MapTab() {
   const [routeDistanceMeters, setRouteDistanceMeters] = useState<number | null>(
     null,
   );
+  const [routeDuration, setRouteDuration] = useState<number | null>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
   const [showLocationToast, setShowLocationToast] = useState(false);
   const router = useRouter();
 
@@ -223,16 +228,56 @@ export default function MapTab() {
     });
   }, []);
 
-  const geojson = useMemo(
-    () => (data ? chargersToGeoJSON(data) : null),
-    [data],
+  // Fly to user location every time the map tab gains focus.
+  // Retries with backoff until the camera is ready (dynamic import delay).
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+
+      const fly = async () => {
+        const last = await getLastKnownPosition();
+        const target = last ?? (await getCurrentPosition());
+        if (!target || cancelled) return;
+
+        const tryCamera = (attempts = 0) => {
+          if (cancelled) return;
+          if (cameraRef.current) {
+            cameraRef.current.setCamera({
+              centerCoordinate: [target.lng, target.lat],
+              zoomLevel: last ? 13 : 11,
+              animationMode: 'easeTo',
+              animationDuration: 800,
+            });
+          } else if (attempts < 15) {
+            setTimeout(() => tryCamera(attempts + 1), 200);
+          }
+        };
+        tryCamera();
+      };
+
+      fly();
+      return () => {
+        cancelled = true;
+      };
+    }, []),
   );
+
+  const geojson = useMemo(() => {
+    if (!data) return null;
+    // Exclude selected charger from clustering so it doesn't get
+    // hidden inside a cluster bubble — the MarkerView handles it.
+    const filtered = selectedCharger
+      ? data.filter((c) => c.id !== selectedCharger.id)
+      : data;
+    return chargersToGeoJSON(filtered);
+  }, [data, selectedCharger]);
 
   // Fetch OSRM route when a charger is selected.
   useEffect(() => {
     if (!selectedCharger) return; // Keep existing route visible when popup dismisses.
 
     let cancelled = false;
+    setRouteLoading(true);
 
     const getFrom = async (): Promise<{ lat: number; lng: number }> => {
       if (userPositionRef.current) return userPositionRef.current;
@@ -253,9 +298,13 @@ export default function MapTab() {
         selectedCharger.lat,
         selectedCharger.lng,
       );
-      if (!cancelled && route) {
-        setRouteCoords(route.coords);
-        setRouteDistanceMeters(route.distanceMeters);
+      if (!cancelled) {
+        if (route) {
+          setRouteCoords(route.coords);
+          setRouteDistanceMeters(route.distanceMeters);
+          setRouteDuration(route.duration);
+        }
+        setRouteLoading(false);
       }
     });
     return () => {
@@ -279,6 +328,7 @@ export default function MapTab() {
     setSelectedCharger(null);
     setRouteCoords(null);
     setRouteDistanceMeters(null);
+    setRouteLoading(false);
     setShowChargerSheet(false);
   }, []);
 
@@ -327,9 +377,12 @@ export default function MapTab() {
         setShowChargerSheet(false);
         setRouteCoords(null);
         setRouteDistanceMeters(null);
+        setRouteLoading(false);
         return;
       }
       const connectors = props.connectors ?? [];
+      setRouteCoords(null);
+      setRouteDistanceMeters(null);
       setSelectedCharger({
         id: props.id,
         title: props.title ?? 'Cargador',
@@ -344,6 +397,9 @@ export default function MapTab() {
         stationStatus: props.station_status,
         current_charging_since: props.current_charging_since,
       });
+      // Keep routeLoading as true while OSRM fetches — MapContent
+      // will show a loading pill on the map itself.
+      setRouteLoading(true);
     }
   }, []);
 
@@ -413,6 +469,8 @@ export default function MapTab() {
         cameraRef={cameraRef}
         sourceRef={sourceRef}
         isRefreshing={isPlaceholderData}
+        routeLoading={routeLoading}
+        sheetOpen={showChargerSheet}
       />
 
       <FiltersSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} />
@@ -422,13 +480,12 @@ export default function MapTab() {
         title={selectedCharger?.title ?? ''}
         source={selectedCharger?.source ?? 'enchufate'}
         connectors={selectedCharger?.connectors ?? []}
-        connectorType={selectedCharger?.connectorType ?? 'tipo_2'}
-        powerKw={selectedCharger?.powerKw ?? 0}
         pricePerHour={selectedCharger?.pricePerHour ?? 0}
         currency={selectedCharger?.currency ?? 'USD'}
         lat={selectedCharger?.lat ?? 0}
         lng={selectedCharger?.lng ?? 0}
         routeDistanceMeters={routeDistanceMeters}
+        routeDuration={routeDuration}
         stationStatus={selectedCharger?.stationStatus}
         charging_since={selectedCharger?.current_charging_since}
         onPressDetail={handleChargerDetail}

@@ -10,7 +10,16 @@
  * Metro "unknown module" errors.
  */
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  Easing,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import type { EdgeInsets } from 'react-native-safe-area-context';
 import { SlidersHorizontal } from 'lucide-react-native';
@@ -63,6 +72,9 @@ export interface MapContentProps {
   cameraRef: React.RefObject<any>;
   sourceRef: React.RefObject<any>;
   isRefreshing?: boolean;
+  routeLoading?: boolean;
+  /** Hide UI overlays that compete with the bottom sheet. */
+  sheetOpen?: boolean;
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -79,9 +91,39 @@ export default function MapContent({
   cameraRef,
   sourceRef,
   isRefreshing = false,
+  routeLoading = false,
+  sheetOpen = false,
 }: MapContentProps) {
   const mapViewRef = useRef<MapboxGL.MapView>(null);
   const barWidth = useRef(new Animated.Value(0)).current;
+
+  // ── Selected-charger bounce animation (≈3s cycle) ─────────
+  // Tied to selectedCharger so it properly resets on mount/unmount.
+  const bounceAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!selectedCharger) return;
+
+    bounceAnim.setValue(0);
+    const bounce = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bounceAnim, {
+          toValue: -15,
+          duration: 900,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(bounceAnim, {
+          toValue: 0,
+          duration: 900,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    bounce.start();
+    return () => bounce.stop();
+  }, [selectedCharger]);
 
   // Stable empty shape — never changes, so the ShapeSource never unmounts.
   const EMPTY_FEATURE: GeoJSON.Feature = {
@@ -127,7 +169,13 @@ export default function MapContent({
     }
 
     cameraRef.current.setCamera({
-      bounds: { ne, sw, padding: 60 },
+      bounds: { ne, sw },
+      padding: {
+        paddingTop: 100,
+        paddingBottom: insets.bottom + 160,
+        paddingLeft: 100,
+        paddingRight: 100,
+      },
       animationMode: 'easeTo',
       animationDuration: 600,
     });
@@ -177,15 +225,8 @@ export default function MapContent({
       >
         <MapboxGL.Camera
           ref={cameraRef}
-          centerCoordinate={INITIAL_CAMERA.centerCoordinate}
-          zoomLevel={INITIAL_CAMERA.zoomLevel}
+          defaultSettings={INITIAL_CAMERA}
           animationDuration={0}
-          padding={{
-            paddingTop: insets.top,
-            paddingBottom: insets.bottom,
-            paddingLeft: 0,
-            paddingRight: 0,
-          }}
         />
         <MapboxGL.Images
           images={{
@@ -369,13 +410,21 @@ export default function MapContent({
         {selectedCharger && (
           <MapboxGL.MarkerView
             coordinate={[selectedCharger.lng, selectedCharger.lat]}
-            anchor={{ x: 0.5, y: 1.12 }}
+            anchor={{ x: 0.5, y: 1 }}
           >
-            <ChargerCallout
-              // title={selectedCharger.title}
-              title="Ver"
-              onPress={onCalloutPress}
-            />
+            <Animated.View
+              style={[
+                styles.selectedMarkerContainer,
+                { transform: [{ translateY: bounceAnim }] },
+              ]}
+            >
+              <ChargerCallout title="Ver" onPress={onCalloutPress} />
+              <Image
+                source={require('@/../assets/icons/plug.png')}
+                style={[styles.selectedPlugImage, { marginTop: -10 }]}
+                resizeMode="contain"
+              />
+            </Animated.View>
           </MapboxGL.MarkerView>
         )}
 
@@ -434,18 +483,28 @@ export default function MapContent({
         </Text> */}
       </View>
 
-      {/* Recenter FAB — bottom-right. */}
+      {/* Route loading indicator — centered on screen while OSRM fetches. */}
+      {routeLoading && (
+        <View style={[styles.routePill, { top: '40%' }]} pointerEvents="none">
+          <ActivityIndicator size={20} color={colors.primary} />
+          <Text style={styles.routePillText}>Calculando ruta...</Text>
+        </View>
+      )}
+
+      {/* Recenter FAB — hidden while bottom sheet is open. */}
       <Mapbox.UserLocation
         animated={true}
         androidRenderMode={'gps'}
         visible={true}
         showsUserHeadingIndicator={true}
       />
-      <FAB
-        onPress={onRecenter}
-        accessibilityLabel="Centrar mapa en tu ubicación"
-        style={{ bottom: insets.bottom + spacing.lg }}
-      />
+      {!sheetOpen && (
+        <FAB
+          onPress={onRecenter}
+          accessibilityLabel="Centrar mapa en tu ubicación"
+          style={{ bottom: insets.bottom + spacing.lg + 64 }}
+        />
+      )}
     </View>
   );
 }
@@ -511,5 +570,38 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: colors.primary,
     borderRadius: 1.5,
+  },
+  selectedMarkerContainer: {
+    alignItems: 'center',
+  },
+  selectedPlugImage: {
+    width: 65,
+    height: 65,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  routePill: {
+    position: 'absolute',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radius.pill,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  routePillText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
   },
 });

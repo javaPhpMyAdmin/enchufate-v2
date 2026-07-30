@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     backgroundColor: '#fff',
-    paddingVertical: spacing.xs + 2,
+    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
     borderRadius: radius.card,
     // Shadow
@@ -76,6 +76,6 @@ const styles = StyleSheet.create({
     marginTop: -1,
   },
   spacer: {
-    height: 6,
+    height: 0,
   },
 });

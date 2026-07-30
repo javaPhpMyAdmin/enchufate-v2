@@ -4,7 +4,7 @@
  * Replaces the old floating ChargerPopup. Opened by tapping the
  * ChargerCallout badge on the map. Uses @gorhom/bottom-sheet v5.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -15,12 +15,15 @@ import {
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 
 import {
+  DirectionsSheet,
+  type DirectionsSheetHandle,
+} from '@/components/molecules/DirectionsSheet';
+import {
   CONNECTOR_LABEL,
   connectorCurrent,
   connectorSpeedLabel,
   type ChargerSource,
   type ConnectorInfo,
-  type ConnectorType,
   type Currency,
 } from '@/features/chargers/types';
 import { useChargingTimer } from '@/hooks/useChargingTimer';
@@ -28,19 +31,21 @@ import { isFeatureEnabled } from '@/lib/features';
 import { formatPrice } from '@/lib/format';
 import { getCurrentPosition, URUGUAY_FALLBACK } from '@/lib/location';
 import { colors, radius, spacing, typography } from '@/theme';
+import { Icon } from '../atoms/Icon';
+import { ArrowUpRight } from 'lucide-react-native';
 
 export interface ChargerBottomSheetProps {
   visible: boolean;
   title: string;
   source: ChargerSource;
   connectors: ConnectorInfo[];
-  connectorType: ConnectorType;
-  powerKw: number;
   pricePerHour: number;
   currency: Currency;
   lat: number;
   lng: number;
   routeDistanceMeters?: number | null;
+  routeDuration?: number | null;
+  routeLoading?: boolean;
   stationStatus?: 'operational' | 'limited' | 'offline';
   charging_since?: string;
   onPressDetail: () => void;
@@ -51,6 +56,25 @@ function formatDistance(meters: number): string {
   const km = meters / 1000;
   if (km < 1) return `${Math.round(meters)} m`;
   return `${km.toFixed(1)} km`;
+}
+
+function formatDuration(seconds: number): string {
+  const totalMinutes = Math.floor(seconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0) {
+    const hLabel = hours === 1 ? 'hora' : 'horas';
+    const mLabel = minutes === 1 ? 'minuto' : 'minutos';
+
+    // Si los minutos son 0 (ej: justo 2 horas), omitimos los minutos
+    return minutes > 0
+      ? `${hours} ${hLabel} y ${minutes} ${mLabel}`
+      : `${hours} ${hLabel}`;
+  }
+
+  const mLabel = totalMinutes === 1 ? 'minuto' : 'minutos';
+  return `${totalMinutes} ${mLabel}`;
 }
 
 /** Haversine fallback when OSRM is unavailable. */
@@ -77,43 +101,42 @@ export function ChargerBottomSheet({
   title,
   source,
   connectors,
-  connectorType,
-  powerKw,
   pricePerHour,
   currency,
   lat,
   lng,
   routeDistanceMeters,
+  routeDuration,
+  routeLoading = false,
   charging_since,
   onPressDetail,
   onDismiss,
 }: ChargerBottomSheetProps) {
   const [fallbackDistance, setFallbackDistance] = useState<number | null>(null);
-  const [loadingFallback, setLoadingFallback] = useState(
-    routeDistanceMeters == null,
-  );
+  const directionsSheetRef = useRef<DirectionsSheetHandle>(null);
 
-  // Haversine fallback if parent didn't provide OSRM distance.
+  // Haversine fallback — only when OSRM finished loading without a result
+  // (offline, OSRM unavailable, or route too short). Waits for routeLoading
+  // to resolve before computing so "Calculando ruta..." isn't interrupted.
   useEffect(() => {
     if (routeDistanceMeters != null) {
-      setLoadingFallback(false);
+      setFallbackDistance(null);
       return;
     }
+    if (routeLoading) return; // wait — OSRM fetch is still in flight
     let mounted = true;
     getCurrentPosition().then((pos) => {
       if (!mounted) return;
       const userLat = pos?.lat ?? URUGUAY_FALLBACK.lat;
       const userLng = pos?.lng ?? URUGUAY_FALLBACK.lng;
       setFallbackDistance(haversineMeters(userLat, userLng, lat, lng));
-      setLoadingFallback(false);
     });
     return () => {
       mounted = false;
     };
-  }, [routeDistanceMeters, lat, lng]);
+  }, [routeDistanceMeters, routeLoading, lat, lng]);
 
   const displayDistance = routeDistanceMeters ?? fallbackDistance;
-  const showLoading = loadingFallback && displayDistance == null;
   const { elapsed } = useChargingTimer(
     isFeatureEnabled('CHARGING_STATUS') ? charging_since : null,
   );
@@ -121,85 +144,124 @@ export function ChargerBottomSheet({
   if (!visible) return null;
 
   return (
-    <BottomSheet
-      index={0}
-      snapPoints={['40%']}
-      enablePanDownToClose
-      onClose={onDismiss}
-    >
-      <BottomSheetView style={styles.container}>
-        {/* Title + close button */}
-        <View style={styles.titleRow}>
-          <Text style={styles.title} numberOfLines={1}>
-            {title}
-          </Text>
-          <Pressable
-            onPress={onDismiss}
-            style={styles.closeButton}
-            hitSlop={12}
-            accessibilityLabel="Cerrar"
-          >
-            <Text style={styles.closeText}>✕</Text>
-          </Pressable>
-        </View>
-
-        {/* Charging elapsed timer */}
-        {elapsed != null && (
-          <View style={styles.chargingBadge}>
-            <Text style={styles.chargingText}>
-              Cargando hace {elapsed}
+    <>
+      <BottomSheet
+        index={0}
+        snapPoints={['45%']}
+        enablePanDownToClose
+        onClose={onDismiss}
+      >
+        <BottomSheetView style={styles.container}>
+          {/* Title + close button */}
+          <View style={styles.titleRow}>
+            <Text style={styles.title} numberOfLines={1}>
+              {title}
             </Text>
+            <Pressable
+              onPress={onDismiss}
+              style={styles.closeButton}
+              hitSlop={12}
+              accessibilityLabel="Cerrar"
+            >
+              <Text style={styles.closeText}>X</Text>
+            </Pressable>
           </View>
-        )}
 
-        {/* Connectors — same layout as old ChargerPopup */}
-        {connectors.map((c, i) => (
-          <View key={i} style={styles.connectorRow}>
-            <View style={styles.connectorDot} />
-            <Text style={styles.connectorText}>
-              {CONNECTOR_LABEL[c.type] ?? c.type} — {c.power_kw} kW ·{' '}
-              {connectorSpeedLabel(c.power_kw)} · {connectorCurrent(c.type)}
-            </Text>
-          </View>
-        ))}
+          {/* Charging elapsed timer */}
+          {elapsed != null && (
+            <View style={styles.chargingBadge}>
+              <Text style={styles.chargingText}>Cargando hace {elapsed}</Text>
+            </View>
+          )}
 
-        {/* Price */}
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Precio</Text>
+          {/* Connectors — same layout as old ChargerPopup */}
+          {connectors.map((c, i) => (
+            <View key={i} style={styles.connectorRow}>
+              <View style={styles.connectorDot} />
+              <Text style={styles.connectorText}>
+                {CONNECTOR_LABEL[c.type] ?? c.type} — {c.power_kw} kW ·{' '}
+                {connectorSpeedLabel(c.power_kw)} · {connectorCurrent(c.type)}
+              </Text>
+            </View>
+          ))}
+
+          {/* Price */}
+
+          {source === 'enchufate' ? (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Precio</Text>
+              <Text style={styles.infoValue}>
+                {formatPrice(pricePerHour, currency)}/h
+              </Text>
+            </View>
+          ) : null}
+          {/* <Text style={styles.infoLabel}>Precio</Text>
           <Text style={styles.infoValue}>
             {formatPrice(pricePerHour, currency)}/h
-          </Text>
-        </View>
+          </Text> */}
 
-        {/* Distance */}
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Distancia</Text>
-          {showLoading ? (
-            <ActivityIndicator size={12} color={colors.primary} />
-          ) : displayDistance != null ? (
-            <Text style={styles.infoValue}>
-              {formatDistance(displayDistance)}
+          {/* Distance */}
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Distancia</Text>
+            {routeLoading ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator size={12} color={colors.primary} />
+                <Text style={styles.loadingText}>Calculando ruta...</Text>
+              </View>
+            ) : displayDistance != null ? (
+              <>
+                <Text style={styles.infoValue}>
+                  {formatDistance(displayDistance)}
+                </Text>
+              </>
+            ) : null}
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Duración estimada</Text>
+            {routeLoading ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator size={12} color={colors.primary} />
+                <Text style={styles.loadingText}>Calculando ruta...</Text>
+              </View>
+            ) : routeDuration != null ? (
+              <Text style={styles.infoValue}>
+                {formatDuration(routeDuration)}
+              </Text>
+            ) : null}
+          </View>
+
+          {/* Source badge + detail button */}
+          <View style={styles.bottomRow}>
+            <Text style={styles.sourceLabel}>
+              {source === 'enchufate' ? 'Particular' : null}
             </Text>
+            {source === 'enchufate' ? (
+              <Pressable onPress={onPressDetail} style={styles.detailButton}>
+                <Text style={styles.detailButtonText}>Ver detalle</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          {source != 'enchufate' ? (
+            <View style={{ alignItems: 'center', marginTop: spacing.md }}>
+              <Pressable
+                onPress={() =>
+                  directionsSheetRef.current?.checkAndOpen({ lat, lng, title })
+                }
+                style={styles.howtoButton}
+              >
+                <Text style={styles.detailButtonText}>Como llegar</Text>
+                <Icon
+                  icon={ArrowUpRight}
+                  size="sm"
+                  color={colors.textOnPrimary}
+                />
+              </Pressable>
+            </View>
           ) : null}
-        </View>
-
-        {/* Source badge + detail button */}
-        <View style={styles.bottomRow}>
-          <Text style={styles.sourceLabel}>
-            {source === 'enchufate'
-              ? 'Particular'
-              : source === 'ute'
-                ? 'UTE'
-                : source === 'ocm'
-                  ? 'Open Charge Map'
-                  : source}
-          </Text>
-          <Pressable onPress={onPressDetail} style={styles.detailButton}>
-            <Text style={styles.detailButtonText}>Ver detalle</Text>
-          </Pressable>
-        </View>
-      </BottomSheetView>
-    </BottomSheet>
+        </BottomSheetView>
+      </BottomSheet>
+      <DirectionsSheet ref={directionsSheetRef} />
+    </>
   );
 }
 
@@ -284,6 +346,16 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
   },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  loadingText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+  },
   detailButton: {
     backgroundColor: colors.primary,
     paddingVertical: spacing.sm,
@@ -294,5 +366,16 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textOnPrimary,
     fontWeight: '600',
+  },
+  howtoButton: {
+    width: '80%',
+    height: 40,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.button,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

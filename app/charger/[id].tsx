@@ -28,8 +28,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
   Image,
-  Linking,
-  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -43,8 +41,6 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
-  Compass,
-  Map,
   MapPin,
   Navigation,
   Share2,
@@ -54,6 +50,7 @@ import {
 import { BottomSheetModal, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DirectionsSheet, type DirectionsSheetHandle } from '@/components/molecules/DirectionsSheet';
 import { Avatar } from '@/components/atoms/Avatar';
 import { Button } from '@/components/atoms/Button';
 import { Card } from '@/components/atoms/Card';
@@ -94,7 +91,7 @@ export default function ChargerDetailScreen() {
   const charger = useCharger(chargerId);
   const chargerRating = useChargerRating(chargerId);
   const sheetRef = useRef<BottomSheetModal>(null);
-  const directionsSheetRef = useRef<BottomSheetModal>(null);
+  const directionsSheetRef = useRef<DirectionsSheetHandle>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
   const createReservation = useCreateReservation();
   const toggleStatus = useToggleChargerStatus();
@@ -107,44 +104,7 @@ export default function ChargerDetailScreen() {
   const onOpenInMaps = useCallback(() => {
     const data = charger.data;
     if (!data) return;
-    const dest = `${data.lat},${data.lng}`;
-    const placeName = encodeURIComponent(data.title);
-
-    const googleUrl = `https://www.google.com/maps/dir/?api=1&destination=${dest}&destination_place_id=${placeName}`;
-    const wazeUrl = `https://waze.com/ul?ll=${dest}&navigate=yes&to=ll.${dest}`;
-    const appleUrl = `https://maps.apple.com/?daddr=${dest}&dirflg=d`;
-
-    if (Platform.OS === 'ios') {
-      // On iOS, Apple Maps is always available; check others via schemes.
-      const iosChecks = [
-        { label: 'Apple Maps', url: appleUrl, icon: Compass as any, color: '#007AFF', scheme: 'maps://' },
-        { label: 'Google Maps', url: googleUrl, icon: Map as any, color: '#34A853', scheme: 'comgooglemaps://' },
-        { label: 'Waze', url: wazeUrl, icon: Navigation as any, color: '#33CCFF', scheme: 'waze://' },
-      ];
-      void Promise.all(
-        iosChecks.map((app) =>
-          Linking.canOpenURL(app.scheme).then((ok) => (ok ? { ...app } : null)),
-        ),
-      ).then((results) => {
-        const apps = results.filter(Boolean) as typeof iosChecks;
-        if (apps.length === 0) return;
-        if (apps.length === 1) { void Linking.openURL(apps[0]!.url); return; }
-        setMapApps(apps);
-        directionsSheetRef.current?.present();
-      });
-    } else {
-      // On Android, Google Maps is always preinstalled — no canOpenURL check needed.
-      // Waze is optional.
-      void Linking.canOpenURL(wazeUrl).then((wazeOk) => {
-        const apps = [
-          { label: 'Google Maps', url: googleUrl, icon: Map as any, color: '#34A853' },
-          ...(wazeOk ? [{ label: 'Waze', url: wazeUrl, icon: Navigation as any, color: '#33CCFF' }] : []),
-        ];
-        if (apps.length === 1) { void Linking.openURL(apps[0]!.url); return; }
-        setMapApps(apps);
-        directionsSheetRef.current?.present();
-      });
-    }
+    directionsSheetRef.current?.checkAndOpen({ lat: data.lat, lng: data.lng, title: data.title });
   }, [charger.data]);
 
   const onShare = useCallback(async () => {
@@ -159,9 +119,6 @@ export default function ChargerDetailScreen() {
     await Share.share({ message }, { dialogTitle: 'Compartir cargador' });
   }, [charger.data]);
 
-  const [mapApps, setMapApps] = useState<
-    Array<{ label: string; url: string; icon: any; color: string }>
-  >([]);
   const [reservationError, setReservationError] = useState<string | null>(null);
   const errorSheetRef = useRef<BottomSheetModal>(null);
 
@@ -449,43 +406,7 @@ export default function ChargerDetailScreen() {
       </BottomSheetModal>
 
       {/* Directions chooser sheet */}
-      <BottomSheetModal
-        ref={directionsSheetRef}
-        snapPoints={['30%']}
-        enableDynamicSizing={false}
-        backdropComponent={(p) => (
-          <BottomSheetBackdrop {...p} appearsOnIndex={0} disappearsOnIndex={-1} />
-        )}
-        backgroundStyle={styles.sheetBg}
-      >
-        <View style={styles.sheetContent}>
-          <Text style={styles.sheetTitle}>Cómo llegar</Text>
-          {mapApps.map((app) => {
-            const AppIcon = app.icon;
-            return (
-              <Pressable
-                key={app.label}
-                onPress={() => {
-                  directionsSheetRef.current?.dismiss();
-                  void Linking.openURL(app.url);
-                }}
-                style={({ pressed }) => [
-                  styles.appRow,
-                  pressed && styles.appRowPressed,
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`Abrir en ${app.label}`}
-              >
-                <View style={[styles.appIcon, { backgroundColor: app.color + '20' }]}>
-                  <AppIcon size={20} color={app.color} strokeWidth={2} />
-                </View>
-                <Text style={styles.appLabel}>{app.label}</Text>
-                <ChevronRight size={18} color={colors.textSecondary} />
-              </Pressable>
-            );
-          })}
-        </View>
-      </BottomSheetModal>
+      <DirectionsSheet ref={directionsSheetRef} />
 
       {/* Error sheet */}
       <BottomSheetModal
@@ -700,25 +621,6 @@ const styles = StyleSheet.create({
   durationLabel: { ...typography.body, color: colors.textPrimary, flex: 1, fontWeight: '500' },
   durationPending: { ...typography.body, color: colors.primary, marginRight: spacing.sm },
   durationError: { ...typography.body, color: '#E53935', marginTop: spacing.sm },
-
-  // ----- Directions chooser -----
-  appRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.button,
-  },
-  appRowPressed: { backgroundColor: colors.surface },
-  appIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.button,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  appLabel: { ...typography.body, color: colors.textPrimary, flex: 1, fontWeight: '500' },
 
   // ----- Error sheet -----
   errorSheetContent: {

@@ -1,67 +1,74 @@
 /**
- * 5-tab bottom-bar layout.
+ * 5-tab native bottom-bar layout.
  *
- * Tabs in order: Inicio, Mapa, Mensajes, Reservas, Perfil.
- * Active tab is tinted with `colors.primary`; inactive is the
- * secondary text color. Each tab has a lucide icon rendered
- * through the shared `Icon` atom so the icon set stays
- * swappable in one place.
+ * Uses NativeTabs (expo-router/unstable-native-tabs) for a true native
+ * UITabBar on iOS and BottomNavigationView on Android.
  *
- * Real screen content lands in Phase 4 (Inicio + Mapa) and Phase 5
- * (Mensajes + Reservas + Perfil). Auth gating (useRequireAuth on
- * the auth-gated tabs) lands in Phase 3.
+ * Platform icons:
+ *   - iOS → SF Symbols via `sf` prop (native, scalable, auto-tinted)
+ *   - Android → VectorIcon helper generates an image source, the native
+ *     layer tints it using `iconColor`.
  */
-import { Tabs } from 'expo-router';
-import { CalendarCheck, Home, Map as MapIcon, MessageCircle, User } from 'lucide-react-native';
+import { NativeTabs, Icon, VectorIcon, Label } from 'expo-router/unstable-native-tabs';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
-import { Icon } from '@/components/atoms/Icon';
 import { colors } from '@/theme';
+
+const iconFamily = MaterialCommunityIcons;
 
 export default function TabsLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textSecondary,
-        tabBarLabelStyle: { fontSize: 12, fontWeight: '500' },
+    <NativeTabs
+      backgroundColor={colors.surfaceWarm}
+      disableIndicator
+      indicatorColor={colors.surfaceWarm}
+      rippleColor={colors.border}
+      iconColor={{ default: colors.textPrimary, selected: colors.primary }}
+      labelStyle={{
+        default: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
+        selected: { fontSize: 13, fontWeight: '700', color: colors.primary },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Inicio',
-          tabBarIcon: ({ color, size }) => <Icon icon={Home} size="md" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="map"
-        options={{
-          title: 'Mapa',
-          tabBarIcon: ({ color, size }) => <Icon icon={MapIcon} size="md" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="messages"
-        options={{
-          title: 'Mensajes',
-          tabBarIcon: ({ color, size }) => <Icon icon={MessageCircle} size="md" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="reservations"
-        options={{
-          title: 'Reservas',
-          tabBarIcon: ({ color, size }) => <Icon icon={CalendarCheck} size="md" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Perfil',
-          tabBarIcon: ({ color, size }) => <Icon icon={User} size="md" color={color} />,
-        }}
-      />
-    </Tabs>
+      <NativeTabs.Trigger name="index">
+        <NativeTabs.Trigger.TabBar backgroundColor={colors.surfaceWarm} />
+        <Label>Inicio</Label>
+        <Icon
+          sf="house.fill"
+          androidSrc={<VectorIcon family={iconFamily} name="home" />}
+        />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="map">
+        <NativeTabs.Trigger.TabBar backgroundColor={colors.surfaceWarm} />
+        <Label>Mapa</Label>
+        <Icon
+          sf="map.fill"
+          androidSrc={<VectorIcon family={iconFamily} name="map" />}
+        />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="messages">
+        <NativeTabs.Trigger.TabBar backgroundColor={colors.surfaceWarm} />
+        <Label>Mensajes</Label>
+        <Icon
+          sf="message.fill"
+          androidSrc={<VectorIcon family={iconFamily} name="message" />}
+        />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="reservations">
+        <NativeTabs.Trigger.TabBar backgroundColor={colors.surfaceWarm} />
+        <Label>Reservas</Label>
+        <Icon
+          sf="calendar"
+          androidSrc={<VectorIcon family={iconFamily} name="calendar" />}
+        />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="profile">
+        <NativeTabs.Trigger.TabBar backgroundColor={colors.surfaceWarm} />
+        <Label>Perfil</Label>
+        <Icon
+          sf="person.fill"
+          androidSrc={<VectorIcon family={iconFamily} name="account" />}
+        />
+      </NativeTabs.Trigger>
+    </NativeTabs>
   );
 }
