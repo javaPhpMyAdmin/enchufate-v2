@@ -3,14 +3,8 @@ import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-na
 import { Check, CheckCheck, Clock } from 'lucide-react-native';
 
 import { Icon } from '@/components/atoms/Icon';
+import type { MessageKind } from '@/features/messaging/types';
 import { colors, radius, spacing, typography } from '@/theme';
-
-export type MessageKind =
-  | 'user'
-  | 'system_reservation_requested'
-  | 'system_reservation_confirmed'
-  | 'system_reservation_cancelled'
-  | 'system_reservation_completed';
 
 export interface MessageBubbleProps {
   body: string;
@@ -49,14 +43,12 @@ export interface MessageBubbleProps {
  */
 export function MessageBubble({
   body,
-  kind,
   isOwn = true,
   timestamp,
   pending = false,
   readAt,
   style,
 }: MessageBubbleProps): React.JSX.Element {
-  const isUser = kind === 'user';
   // Any message belonging to the current user gets the outgoing style
   // (orange bubble, white text) regardless of kind.
   const isOutgoing = isOwn;

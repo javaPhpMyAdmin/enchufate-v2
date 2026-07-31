@@ -19,7 +19,9 @@ export type MessageKind =
   | 'user'
   | 'system_reservation_requested'
   | 'system_reservation_confirmed'
-  | 'system_reservation_cancelled';
+  | 'system_reservation_cancelled'
+  /** Host started charging — added by the charging_status migration. */
+  | 'system_charging_started';
 
 export interface Message {
   id: string;

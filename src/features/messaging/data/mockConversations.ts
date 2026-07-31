@@ -15,8 +15,6 @@
  */
 import type { Conversation } from '../types';
 
-const NOW = '2026-07-18T12:00:00Z';
-
 export const MOCK_RENTER_ID = 'mock-uid';
 
 export const MOCK_CONVERSATIONS: Conversation[] = [
@@ -63,6 +61,23 @@ export const MOCK_CONVERSATIONS: Conversation[] = [
     last_message_at: '2026-07-15T09:05:00Z',
     last_message_body: 'Perfecto, nos vemos mañana a las 10.',
     last_message_kind: 'user',
+    unread_count: 0,
+  },
+  {
+    // Matches the en_curso reservation mock (r0001-0005) so the
+    // "Chatear" CTA on that detail screen navigates to a real thread.
+    id: 'c1d2e3f4-0005-4000-8000-000000000005',
+    charger_id: 'a1b2c3d4-0002-4000-8000-000000000002',
+    charger_title: 'Cargador Centro',
+    renter_id: MOCK_RENTER_ID,
+    renter_name: 'Usuario Demo',
+    renter_avatar_url: null,
+    host_id: '00000000-0000-0000-0000-000000000002',
+    host_name: 'Lucía Fernández',
+    host_avatar_url: null,
+    last_message_at: '2026-07-31T09:25:00Z',
+    last_message_body: 'Carga iniciada en Cargador Centro.',
+    last_message_kind: 'system_charging_started',
     unread_count: 0,
   },
 ];
