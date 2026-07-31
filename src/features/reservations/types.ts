@@ -90,10 +90,12 @@ export function otherParty(
   };
 }
 
-/** Whether the cancel CTA should render for a given status. */
-export function isCancellable(status: ReservationStatus): boolean {
-  return status === 'solicitada' || status === 'confirmada' || status === 'en_curso';
-}
+/**
+ * Whether the cancel CTA should render for a reservation.
+ * Re-exported from `state-machine.ts` (the single source of truth)
+ * so call sites can keep importing from `types.ts` unchanged.
+ */
+export { isCancellable } from './state-machine';
 
 /**
  * Build the time-block string the cards display. Structured

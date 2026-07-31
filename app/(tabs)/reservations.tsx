@@ -23,6 +23,7 @@
  */
 import { useState } from 'react';
 import {
+  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -39,13 +40,15 @@ import { ErrorState } from '@/components/molecules/ErrorState';
 import { Icon } from '@/components/atoms/Icon';
 import { LoadingState } from '@/components/molecules/LoadingState';
 import { Skeleton } from '@/components/molecules/Skeleton';
+import { AppError } from '@/lib/error';
 import {
   ReservationCard,
   type ReservationRole as CardRole,
 } from '@/components/molecules/ReservationCard';
 import { useSession } from '@/features/auth/hooks/useSession';
+import { useEndCharging } from '@/features/reservations/mutations/endCharging';
 import { useReservations } from '@/features/reservations/hooks/useReservations';
-import { otherParty, timeBlock, type Reservation, type ReservationRole } from '@/features/reservations/types';
+import { isCancellable, otherParty, timeBlock, type Reservation, type ReservationRole } from '@/features/reservations/types';
 import { useReviewEligibility } from '@/features/reviews/hooks/useReviewEligibility';
 import { isFeatureEnabled } from '@/lib/features';
 import { formatDateTime } from '@/lib/format';
@@ -236,8 +239,41 @@ function ReservationRow({
   onPress: () => void;
 }): React.JSX.Element {
   const router = useRouter();
+  const { endCharging, isPending: isEndingCharging } = useEndCharging();
   const party = otherParty(reservation, currentUserId);
   const time = timeBlock(reservation);
+  // Time-aware cancellability — computed by the parent because the
+  // card only receives primitives; `isCancellable` needs the full
+  // reservation (end_at) from the state machine.
+  const canCancel = isCancellable(reservation);
+  const onEndChargingPress = () => {
+    Alert.alert(
+      `¿Finalizar la carga en ${reservation.charger_title}?`,
+      'Esta acción la pueden hacer tanto el anfitrión como el huésped mientras la carga está en curso.',
+      [
+        { text: 'Volver', style: 'cancel' },
+        {
+          text: 'Finalizar carga',
+          style: 'destructive',
+          onPress: () => {
+            // On success the mutation invalidates the reservation
+            // queries and the list refetches — the card flips to
+            // `completada` on its own (same UX as the detail
+            // screen, which also relies on query invalidation).
+            void endCharging(reservation.id, reservation.status).catch(
+              (err: unknown) => {
+                const message =
+                  err instanceof AppError
+                    ? err.userMessage
+                    : 'Intentá de nuevo en unos minutos.';
+                Alert.alert('No pudimos finalizar la carga', message);
+              },
+            );
+          },
+        },
+      ],
+    );
+  };
   // ReservationCard's expected `status` is the StatusPillKind, which
   // is a superset of ReservationStatus (it also includes 'disponible').
   const showReviewCta =
@@ -264,7 +300,14 @@ function ReservationRow({
       otherPartyAvatarUri={party.avatarUrl}
       role={role}
       onPress={onPress}
+      canCancel={canCancel}
       chargingStartedAt={reservation.charging_started_at}
+      onEndCharging={
+        isFeatureEnabled('CHARGING_STATUS') && reservation.status === 'en_curso'
+          ? onEndChargingPress
+          : undefined
+      }
+      isEndingCharging={isEndingCharging}
       onReviewPress={reviewCta}
     />
   );

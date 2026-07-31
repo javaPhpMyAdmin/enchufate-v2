@@ -36,7 +36,8 @@ import { sendPushNotification } from '@/lib/push';
 import { useSession } from '@/features/auth/hooks/useSession';
 
 import { MOCK_RESERVATIONS } from '../data/mockReservations';
-import { isCancellable, type ReservationStatus } from '../state-machine';
+import { isCancellable } from '../state-machine';
+import type { Reservation } from '../types';
 
 const isMockSupabase = (): boolean =>
   !process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
@@ -49,7 +50,7 @@ export interface UseCancelReservationResult {
   // type, not a real call site. The disabled line below is the
   // narrowest way to silence the warning without renaming.
   // eslint-disable-next-line no-unused-vars
-  cancel: (reservationId: string, currentStatus: ReservationStatus, reason?: string) => Promise<void>;
+  cancel: (reservation: Reservation, reason?: string) => Promise<void>;
   isPending: boolean;
   error: AppError | null;
   reset: () => void;
@@ -61,9 +62,9 @@ export function useCancelReservation(): UseCancelReservationResult {
   const mutation: UseMutationResult<
     void,
     AppError,
-    { id: string; currentStatus: ReservationStatus; reason?: string }
-  > = useMutation<void, AppError, { id: string; currentStatus: ReservationStatus; reason?: string }>({
-    mutationFn: async ({ id, currentStatus, reason }) => {
+    { reservation: Reservation; reason?: string }
+  > = useMutation<void, AppError, { reservation: Reservation; reason?: string }>({
+    mutationFn: async ({ reservation, reason }) => {
       if (!isFeatureEnabled('RESERVATIONS')) {
         throw new AppError({
           code: 'feature_disabled',
@@ -82,13 +83,14 @@ export function useCancelReservation(): UseCancelReservationResult {
         });
       }
 
-      // Client-side state-machine guard. `isCancellable` returns
-      // true for `solicitada` and `confirmada`; false for the
-      // terminal states `cancelada` and `completada`.
-      if (!isCancellable(currentStatus)) {
+      // Client-side state-machine guard. `isCancellable` is
+      // time-aware: `confirmada` is cancellable only while
+      // `now < end_at`; false for the terminal states `cancelada`
+      // and `completada`.
+      if (!isCancellable(reservation)) {
         throw new AppError({
           code: 'invalid_transition',
-          message: `Cannot cancel a reservation in status ${currentStatus}`,
+          message: `Cannot cancel a reservation in status ${reservation.status}`,
           userMessage: 'Esta reserva ya no se puede cancelar.',
           retryable: false,
         });
@@ -96,7 +98,7 @@ export function useCancelReservation(): UseCancelReservationResult {
 
       if (isMockSupabase()) {
         // ----- MOCK data path -----
-        const found = MOCK_RESERVATIONS.find((r) => r.id === id);
+        const found = MOCK_RESERVATIONS.find((r) => r.id === reservation.id);
         if (found) {
           found.status = 'cancelada';
           found.updated_at = new Date().toISOString();
@@ -122,13 +124,13 @@ export function useCancelReservation(): UseCancelReservationResult {
       const updateResult = (await (supabase
         .from('reservations' as never)
         .update(updatePayload)
-        .eq('id', id) as unknown as Promise<{ error: unknown }>));
+        .eq('id', reservation.id) as unknown as Promise<{ error: unknown }>));
       if (updateResult.error) throw normalizeSupabaseError(updateResult.error);
     },
     onSuccess: (_void, vars) => {
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: ['reservations'] }),
-        queryClient.invalidateQueries({ queryKey: ['reservation', vars.id] }),
+        queryClient.invalidateQueries({ queryKey: ['reservation', vars.reservation.id] }),
         queryClient.invalidateQueries({ queryKey: ['conversations'] }),
         queryClient.invalidateQueries({ queryKey: ['messages'] }),
       ]);
@@ -139,7 +141,7 @@ export function useCancelReservation(): UseCancelReservationResult {
           const { data: reservation } = await supabase
             .from('reservations')
             .select('renter_id, charger_id')
-            .eq('id', vars.id)
+            .eq('id', vars.reservation.id)
             .single();
           if (!reservation) return;
 
@@ -173,7 +175,7 @@ export function useCancelReservation(): UseCancelReservationResult {
   });
 
   return {
-    cancel: (id, currentStatus, reason) => mutation.mutateAsync({ id, currentStatus, reason }),
+    cancel: (reservation, reason) => mutation.mutateAsync({ reservation, reason }),
     isPending: mutation.isPending,
     error: mutation.error ? normalizeSupabaseError(mutation.error) : null,
     reset: mutation.reset,

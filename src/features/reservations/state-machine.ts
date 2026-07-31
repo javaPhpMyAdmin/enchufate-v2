@@ -19,6 +19,7 @@
  * both the client mutation hook and any future server-side
  * validation layer.
  */
+import type { Reservation } from './types';
 
 /**
  * Status enum mirrors the SQL `reservation_status` from
@@ -121,14 +122,35 @@ export function nextStatus(
 }
 
 /**
- * True when the cancel CTA should render for the given status.
- * Mirrors the existing `isCancellable` in `types.ts`; this version
- * is the single source of truth for the state machine and is
- * re-exported through the reservation feature. The detail screen
- * keeps using `isCancellable` from `types.ts` (which delegates
- * here in a follow-up commit) so the screen file does not need to
- * change.
+ * True when the cancel CTA should render for a reservation.
+ *
+ * Time-aware: a `confirmada` reservation with a structured slot is
+ * cancellable ONLY while the slot hasn't ended (`now < end_at`).
+ * Once `end_at` passes, the system treats the reservation as done
+ * (the cron sweeps it to `completada`); showing "Cancelar reserva"
+ * on an expired slot is stale-state. The `horario_a_coordinar`
+ * fallback has no time bound, so it stays cancellable until
+ * charging starts.
+ *
+ * Rules:
+ *   solicitada  → true (either party)
+ *   confirmada  → `end_at == null` (a coordinar) OR `now < end_at`
+ *   en_curso    → true (either party — decision 2026-07-30)
+ *   completada / cancelada → false (terminal states)
  */
-export function isCancellable(status: ReservationStatus): boolean {
-  return status === 'solicitada' || status === 'confirmada' || status === 'en_curso';
+export function isCancellable(
+  reservation: Reservation,
+  now: Date = new Date(),
+): boolean {
+  if (
+    reservation.status === 'solicitada' ||
+    reservation.status === 'en_curso'
+  ) {
+    return true;
+  }
+  if (reservation.status === 'confirmada') {
+    if (reservation.end_at == null) return true; // horario a coordinar
+    return now < new Date(reservation.end_at);
+  }
+  return false;
 }

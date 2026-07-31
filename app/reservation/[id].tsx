@@ -12,7 +12,7 @@
  *     system browser with a Google Maps URL
  *   - "Chatear" Button → navigates to the paired conversation
  *     thread at `/messages/[conversation_id]`
- *   - "Cancelar reserva" Button (only when `isCancellable(status)`
+ *   - "Cancelar reserva" Button (only when `isCancellable(r)`
  *     is true) → opens a `ConfirmModal` (Phase 7 task 7.6). On
  *     confirm, calls `useCancelReservation().cancel(id)` which
  *     hits the real Supabase path (or the mock when the
@@ -142,11 +142,7 @@ export default function ReservationDetailScreen() {
   const onCancelConfirm = useCallback(async () => {
     if (!reservation.data) return;
     try {
-      await cancel(
-        reservation.data.id,
-        reservation.data.status as ReservationStatus,
-        cancelReason || undefined,
-      );
+      await cancel(reservation.data, cancelReason || undefined);
       setCancelModalVisible(false);
       setCancelReason('');
       // Pop back to the reservations list. The TanStack Query
@@ -410,7 +406,7 @@ export default function ReservationDetailScreen() {
               disabled={isConfirming}
             />
           ) : null}
-          {isCancellable(r.status as ReservationStatus) ? (
+          {isCancellable(r) ? (
             <Button
               label="Cancelar reserva"
               variant="danger"

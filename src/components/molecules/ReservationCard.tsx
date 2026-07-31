@@ -29,12 +29,28 @@ export interface ReservationCardProps {
   role: ReservationRole;
   onPress?: () => void;
   /**
-   * Optional cancel handler. When provided AND the reservation
-   * status is cancellable (`solicitada` or `confirmada`), a
-   * secondary "Cancelar" Button renders below the meta rows. The
-   * parent owns the confirmation modal; the card just delegates.
+   * Whether the cancel CTA should render. Computed by the parent
+   * with `isCancellable(reservation)` from the reservation
+   * state-machine (time-aware) — the card itself stays
+   * status-agnostic and just delegates.
+   */
+  canCancel?: boolean;
+  /**
+   * Optional cancel handler. When provided AND `canCancel` is
+   * true, a secondary "Cancelar reserva" Button renders below the
+   * meta rows. The parent owns the confirmation modal; the card
+   * just delegates.
    */
   onCancel?: () => void;
+  /**
+   * Optional end-charging handler. When provided AND status is
+   * `en_curso` AND the `CHARGING_STATUS` feature flag is on, a
+   * danger "Finalizar carga" Button renders below the meta rows.
+   * The parent owns the confirmation flow; the card delegates.
+   */
+  onEndCharging?: () => void;
+  /** True while the end-charging mutation is in flight. */
+  isEndingCharging?: boolean;
   /**
    * Optional review CTA callback. When set AND status is
    * `completada` AND the `CHARGER_REVIEWS` feature flag is on,
@@ -59,7 +75,10 @@ export function ReservationCard({
   otherPartyAvatarUri,
   role,
   onPress,
+  canCancel,
   onCancel,
+  onEndCharging,
+  isEndingCharging,
   onReviewPress,
   chargingStartedAt,
   style,
@@ -71,19 +90,11 @@ export function ReservationCard({
       ? chargingStartedAt
       : null,
   );
-  // The cancel CTA only renders when the parent provides a
-  // handler AND the reservation is still cancellable. The
-  // inline check matches the `isCancellable` rule from
-  // `src/features/reservations/state-machine.ts` (true for
-  // 'solicitada' or 'confirmada'). We inline the check
-  // here because `status` is typed as `StatusPillKind` (which
-  // also includes 'disponible' for the charger-card reuse
-  // case) — calling the helper directly would error on the
-  // 'disponible' arm. The list screen + detail screen pass a
-  // `ReservationStatus` so the inline check covers the actual
-  // value domain.
-  const canCancel =
-    Boolean(onCancel) && (status === 'solicitada' || status === 'confirmada');
+  // The cancel CTA renders only when the parent provides a
+  // handler AND the parent computed the reservation as still
+  // cancellable (time-aware `isCancellable` from the state
+  // machine — the card lacks `end_at` to judge itself).
+  const canShowCancel = Boolean(onCancel) && canCancel === true;
   return (
     <Card variant="default" padding="md" onPress={onPress} accessibilityLabel={chargerTitle} style={style}>
       <View style={styles.header}>
@@ -122,7 +133,7 @@ export function ReservationCard({
           </View>
         ) : null}
       </View>
-      {canCancel ? (
+      {canShowCancel ? (
         <View style={styles.actions}>
           <Button
             label="Cancelar reserva"
@@ -131,6 +142,21 @@ export function ReservationCard({
             fullWidth
             onPress={onCancel}
             accessibilityLabel={`Cancelar reserva de ${chargerTitle}`}
+          />
+        </View>
+      ) : null}
+      {isFeatureEnabled('CHARGING_STATUS') &&
+      status === 'en_curso' &&
+      onEndCharging ? (
+        <View style={styles.actions}>
+          <Button
+            label={isEndingCharging ? 'Finalizando...' : 'Finalizar carga'}
+            variant="danger"
+            size="sm"
+            fullWidth
+            disabled={isEndingCharging}
+            onPress={onEndCharging}
+            accessibilityLabel={`Finalizar carga en ${chargerTitle}`}
           />
         </View>
       ) : null}
