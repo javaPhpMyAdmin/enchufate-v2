@@ -255,6 +255,7 @@ function AuthedState({
                 lng={c.lng}
                 powerKw={c.power_kw}
                 status={c.status === 'active' ? 'disponible' : 'paused'}
+                chargingStartedAt={c.current_charging_since}
                 onPress={
                   isFeatureEnabled('EDIT_CHARGER')
                     ? () => router.push(`/edit-charger/${c.id}` as never)

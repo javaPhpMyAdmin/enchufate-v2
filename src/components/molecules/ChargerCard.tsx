@@ -7,6 +7,7 @@ import { Card } from '@/components/atoms/Card';
 import { Icon } from '@/components/atoms/Icon';
 import { StatusPill, type StatusPillKind } from '@/components/atoms/StatusPill';
 import { useResolvedAddress } from '@/features/chargers/hooks/useResolvedAddress';
+import { useChargingTimer } from '@/hooks/useChargingTimer';
 import { colors, spacing, typography } from '@/theme';
 
 export interface ChargerCardProps {
@@ -24,6 +25,8 @@ export interface ChargerCardProps {
   hostAvatarUri?: string | null;
   /** Whole-card press handler; navigates to charger detail in Phase 6. */
   onPress?: () => void;
+  /** When set, the charger has an active charging session; the card shows a live elapsed timer. */
+  chargingStartedAt?: string | null;
   /** Optional accessory rendered in the footer row (e.g. action buttons). */
   footerAccessory?: ReactNode;
   style?: StyleProp<ViewStyle>;
@@ -54,11 +57,13 @@ export function ChargerCard({
   hostName,
   hostAvatarUri,
   onPress,
+  chargingStartedAt,
   footerAccessory,
   style,
 }: ChargerCardProps): React.JSX.Element {
   const resolvedAddress = useResolvedAddress(address, lat, lng);
   const displayAddress = resolvedAddress.data ?? address;
+  const { elapsed } = useChargingTimer(chargingStartedAt);
 
   return (
     <Card variant="default" padding="md" onPress={onPress} accessibilityLabel={title} style={style}>
@@ -75,7 +80,11 @@ export function ChargerCard({
             </Text>
           </View>
         </View>
-        <StatusPill status={status} />
+        {elapsed ? (
+          <StatusPill status="en_curso" label={`En carga · ${elapsed}`} />
+        ) : (
+          <StatusPill status={status} />
+        )}
       </View>
       <View style={styles.footer}>
         <View style={styles.footerLeft}>
