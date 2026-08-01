@@ -7,12 +7,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   DirectionsSheet,
@@ -95,6 +97,17 @@ function haversineMeters(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Native tab bar height above the safe-area inset. The sheet is
+// rendered inline in the map screen, so @gorhom/bottom-sheet measures
+// the full window height; bottomInset lifts the sheet's bottom edge
+// above the real UITabBar (iOS ~49pt) / BottomNavigationView
+// (Android ~80dp).
+const TAB_BAR_HEIGHT = Platform.select({
+  ios: 49,
+  android: 80,
+  default: 56,
+});
+
 // ── Component ────────────────────────────────────────────────
 export function ChargerBottomSheet({
   visible,
@@ -114,6 +127,7 @@ export function ChargerBottomSheet({
 }: ChargerBottomSheetProps) {
   const [fallbackDistance, setFallbackDistance] = useState<number | null>(null);
   const directionsSheetRef = useRef<DirectionsSheetHandle>(null);
+  const insets = useSafeAreaInsets();
 
   // Haversine fallback — only when OSRM finished loading without a result
   // (offline, OSRM unavailable, or route too short). Waits for routeLoading
@@ -147,7 +161,8 @@ export function ChargerBottomSheet({
     <>
       <BottomSheet
         index={0}
-        snapPoints={['45%']}
+        snapPoints={['60%']}
+        bottomInset={insets.bottom + TAB_BAR_HEIGHT}
         enablePanDownToClose
         onClose={onDismiss}
       >
