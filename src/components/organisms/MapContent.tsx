@@ -35,6 +35,14 @@ import Mapbox from '@rnmapbox/maps';
 const MAPBOX_STYLE = MapboxGL.StyleURL.Street;
 const CARGADOR_ICON_ID = 'cargador';
 
+// Charging pulse halo — ring that expands + fades around charging pins.
+const PULSE_RING_SIZE = 44;
+const PULSE_RING_BORDER = 3;
+const PULSE_DURATION_MS = 1400;
+const PULSE_SCALE_MIN = 0.5;
+const PULSE_SCALE_MAX = 1.8;
+const PULSE_OPACITY_MAX = 0.5;
+
 MapboxGL.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN || '');
 
 const INITIAL_CAMERA = {
@@ -144,6 +152,27 @@ export default function MapContent({
       },
     };
   }, [routeCoords]);
+
+  // Actively-charging P2P pins (source=enchufate with current_charging_since
+  // set). Keyed on geojson so a Realtime update that clears the field drops
+  // the feature here and its pulse MarkerView unmounts naturally.
+  const chargingPins = useMemo(() => {
+    if (!geojson) return [];
+    const pins: { id: string; lat: number; lng: number }[] = [];
+    for (const f of geojson.features) {
+      const props = f.properties;
+      if (props?.source !== 'enchufate') continue;
+      if (!props.current_charging_since) continue;
+      const id = typeof props.id === 'string' ? props.id : '';
+      if (!id) continue;
+      const coords = f.geometry.type === 'Point' ? f.geometry.coordinates : null;
+      const lat = typeof props.lat === 'number' ? props.lat : coords?.[1];
+      const lng = typeof props.lng === 'number' ? props.lng : coords?.[0];
+      if (lat == null || lng == null) continue;
+      pins.push({ id, lat, lng });
+    }
+    return pins;
+  }, [geojson]);
 
   // Fit camera to route bounds.
   useEffect(() => {
@@ -428,6 +457,20 @@ export default function MapContent({
           </MapboxGL.MarkerView>
         )}
 
+        {/* Live pulse halo on actively-charging pins — one MarkerView per
+            pin, centered (anchor 0.5/0.5) so the ring grows around the
+            orange CircleLayer pin. Static pin layers above stay untouched. */}
+        {chargingPins.length > 0 &&
+          chargingPins.map((pin) => (
+            <MapboxGL.MarkerView
+              key={pin.id}
+              coordinate={[pin.lng, pin.lat]}
+              anchor={{ x: 0.5, y: 0.5 }}
+            >
+              <ChargingPulse />
+            </MapboxGL.MarkerView>
+          ))}
+
         <Mapbox.UserLocation
           animated={true}
           androidRenderMode={'gps'}
@@ -509,6 +552,51 @@ export default function MapContent({
   );
 }
 
+// ── ChargingPulse ────────────────────────────────────────────
+// Expanding + fading halo ring around an actively-charging pin.
+// Visual only: pointerEvents="none" so pin touches still reach the
+// ShapeSource onPress handler underneath the MarkerView.
+function ChargingPulse() {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(pulse, {
+        toValue: 1,
+        duration: PULSE_DURATION_MS,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+        isInteraction: false,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.pulseRing,
+        {
+          transform: [
+            {
+              scale: pulse.interpolate({
+                inputRange: [0, 1],
+                outputRange: [PULSE_SCALE_MIN, PULSE_SCALE_MAX],
+              }),
+            },
+          ],
+          opacity: pulse.interpolate({
+            inputRange: [0, 1],
+            outputRange: [PULSE_OPACITY_MAX, 0],
+          }),
+        },
+      ]}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   topBar: {
@@ -573,6 +661,14 @@ const styles = StyleSheet.create({
   },
   selectedMarkerContainer: {
     alignItems: 'center',
+  },
+  pulseRing: {
+    width: PULSE_RING_SIZE,
+    height: PULSE_RING_SIZE,
+    borderRadius: PULSE_RING_SIZE / 2,
+    borderWidth: PULSE_RING_BORDER,
+    borderColor: colors.charging,
+    backgroundColor: 'transparent',
   },
   selectedPlugImage: {
     width: 65,
