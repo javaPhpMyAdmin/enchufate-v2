@@ -7,8 +7,19 @@
  */
 import * as Location from 'expo-location';
 
-/** Matches "-34.9012, -56.2090" or "-34.9012,-56.2090" (with or without spaces). */
-const COORD_REGEX = /^-?\d{1,3}\.\d{2,8}\s*,\s*-?\d{1,3}\.\d{2,8}$/;
+/**
+ * Matches "-34.9012, -56.2090" or "-34.9, -56.2" (with or without
+ * spaces, 1-8 decimal digits). 1-8 (not 2-8) so a partially edited
+ * fallback like "-34.9, -56.2" is still caught — a host trimming
+ * the decimals must not bypass the publish guard.
+ *
+ * MUST stay byte-identical to `v_coord_pattern` in
+ * `supabase/migrations/20260802000001_fix_confirmed_message_address.sql`
+ * — the server trigger uses the same pattern to keep raw coordinates
+ * out of system messages, so a mismatch would classify the same
+ * string differently on each side.
+ */
+const COORD_REGEX = /^-?\d{1,3}\.\d{1,8}\s*,\s*-?\d{1,3}\.\d{1,8}$/;
 
 /**
  * Returns true when `address` looks like raw lat/lng coordinates

@@ -11,6 +11,12 @@
  * as a blob and uploaded to the `charger-photos` bucket. The public
  * URL is stored in the charger record's `photos` array.
  *
+ * Address guard: if the draft address is coordinate-shaped (the
+ * legacy reverse-geocode fallback), the hook re-attempts
+ * `reverseGeocode` once and blocks the publish with a typed
+ * `AppError` if it still fails — so raw lat/lng never end up in the
+ * chat system message rendered from `chargers.address`.
+ *
  * Errors are normalized to `AppError` via `normalizeSupabaseError`.
  * The validation case is special-cased so a `chargerSchema.parse`
  * failure surfaces as a typed `AppError` instead of leaking a Zod
@@ -23,6 +29,7 @@ import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 
 import { AppError, normalizeSupabaseError } from '@/lib/error';
+import { isCoordinateAddress, reverseGeocode } from '@/lib/geocode';
 import { chargerSchema } from '@/lib/schemas/charger';
 import { isFeatureEnabled } from '@/lib/features';
 import { queryClient } from '@/lib/queryClient';
@@ -129,6 +136,39 @@ export function usePublishCharger(): UsePublishChargerResult & {
           userMessage: 'Faltan datos del cargador. Revisá los pasos anteriores.',
           retryable: false,
         });
+      }
+
+      // ----- 2.5 Resolve coordinate-shaped addresses -----
+      // Legacy behavior: when reverse geocoding fails, `reverseGeocode`
+      // falls back to raw coordinates ("-34.9012, -56.2090") and the
+      // wizard saves that as `address`. The confirmed-system-message
+      // trigger renders `chargers.address` verbatim into the chat, so
+      // a guest would see raw coords instead of a street address.
+      // Re-try the geocode once; if it still fails, block the publish
+      // with a typed AppError so the host writes a readable address.
+      if (isCoordinateAddress(payload.address)) {
+        const lat = payload.lat;
+        const lng = payload.lng;
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          throw new AppError({
+            code: 'unresolved_address',
+            message: 'publish address is coordinate-shaped and lat/lng are missing or invalid',
+            userMessage:
+              'No pudimos identificar la dirección. Escribila manualmente para que los huéspedes la encuentren.',
+            retryable: false,
+          });
+        }
+        const resolvedAddress = await reverseGeocode(lat, lng);
+        if (isCoordinateAddress(resolvedAddress)) {
+          throw new AppError({
+            code: 'unresolved_address',
+            message: `reverse geocode returned coordinate-shaped address for (${lat}, ${lng})`,
+            userMessage:
+              'No pudimos identificar la dirección. Escribila manualmente para que los huéspedes la encuentren.',
+            retryable: false,
+          });
+        }
+        payload.address = resolvedAddress;
       }
 
       // ----- 3. Photo upload -----

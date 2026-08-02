@@ -23,10 +23,19 @@
  * the mutation is in flight the button shows a loading spinner
  * and stays disabled. On success the mutation navigates to
  * `/publish/success` (handled inside the hook via
- * `router.replace`); on error the typed `AppError` is exposed
- * via `error.userMessage` for the step 7 screen to surface.
+ * `router.replace`).
+ *
+ * **Publish errors**: this footer owns the single
+ * `usePublishCharger()` instance, so it renders the mutation's
+ * `error.userMessage` inline (danger-tinted banner, same pattern
+ * as the step-4 photos hint) whenever a publish attempt fails on
+ * step 7. The promise from `publish()` is awaited/caught here so
+ * a rejection never becomes an unhandled rejection, and the error
+ * state resets before every new attempt and whenever the user
+ * leaves the final step (the unresolved-address message points
+ * them back to step 2).
  */
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -110,7 +119,16 @@ export function PublishWizardNav(): React.JSX.Element {
   const nextStep = usePublishStore((s) => s.nextStep);
   const prevStep = usePublishStore((s) => s.prevStep);
 
-  const { publish, isPending } = usePublishCharger();
+  const { publish, isPending, error, reset } = usePublishCharger();
+
+  // Clear a stale publish failure as soon as the user leaves the
+  // final step. The unresolved-address banner tells the host to go
+  // back to step 2, and the error must not linger in the footer
+  // while they re-type the address. On a fresh attempt the press
+  // handler also calls `reset()` (see `onPrimaryPress`).
+  useEffect(() => {
+    reset();
+  }, [reset, step]);
 
   const canAdvance = validateCurrentStep(step, {
     name,
@@ -129,16 +147,20 @@ export function PublishWizardNav(): React.JSX.Element {
 
   const onPrimaryPress = useCallback(() => {
     if (isFinalStep) {
-      // `publish` is fire-and-forget here: the mutation handles
-      // navigation to /publish/success on success and surfaces the
-      // typed AppError via `error.userMessage` for the screen to
-      // render. We intentionally don't await — the user is already
-      // staring at a loading spinner on the CTA.
-      void publish();
+      // Clear any previous failure first so a stale banner isn't
+      // stuck on screen, then start a fresh publish. The rejection
+      // is explicitly handled (no bare `void publish()` discard) —
+      // the typed AppError surfaces via `error.userMessage` on the
+      // next render, so an unhandled rejection never fires.
+      reset();
+      void publish().catch(() => {
+        // Error already surfaced through the hook's `error` state;
+        // nothing else to do here.
+      });
       return;
     }
     nextStep();
-  }, [isFinalStep, publish, nextStep]);
+  }, [isFinalStep, publish, reset, nextStep]);
 
   return (
     <View style={[styles.wrap, { paddingBottom: insets.bottom + spacing.sm }]}>
@@ -161,6 +183,16 @@ export function PublishWizardNav(): React.JSX.Element {
         })}
       </View>
       <Text style={styles.stepLabel}>Paso {step} de {TOTAL_STEPS}</Text>
+      {isFinalStep && error ? (
+        <View style={styles.errorBox} accessibilityRole="alert">
+          <Text style={styles.errorText}>{error.userMessage}</Text>
+          {error.code === 'unresolved_address' ? (
+            <Text style={styles.errorHint}>
+              Volvé al paso 2 y escribí la dirección manualmente.
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
       <View style={styles.row}>
         {isFirstStep ? (
           <View style={styles.spacer} />
@@ -206,6 +238,23 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: spacing.sm,
+  },
+  // Danger-tinted inline banner — same pattern as the step-4 photos
+  // hint (dangerSurface background + danger caption text).
+  errorBox: {
+    backgroundColor: colors.dangerSurface,
+    borderRadius: radius.input,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  errorText: {
+    ...typography.caption,
+    color: colors.danger,
+    fontWeight: '600',
+  },
+  errorHint: {
+    ...typography.caption,
+    color: colors.danger,
   },
   flex: { flex: 1 },
   spacer: { flex: 1 },
