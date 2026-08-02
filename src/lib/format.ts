@@ -32,6 +32,29 @@ export function formatPrice(price: number, currency: string): string {
 }
 
 /**
+ * Format a charger power value in kilowatts.
+ *
+ * PostgREST serializes Postgres `numeric(6,2)` columns as JSON
+ * strings ("22.00"), so `kw` can arrive as a string at the render
+ * boundary. Numeric strings are coerced so the real value still
+ * renders; anything else falls back to '— kW' instead of crashing
+ * the UI.
+ *
+ * Examples:
+ *   formatPower(22)      → '22 kW'
+ *   formatPower(7.4)     → '7.4 kW'
+ *   formatPower('22.00') → '22 kW'
+ *   formatPower(null)    → '— kW'
+ */
+export function formatPower(kw: number | string | null | undefined): string {
+  if (kw == null) return '— kW';
+  if (typeof kw === 'string' && kw.trim() === '') return '— kW';
+  const value = typeof kw === 'number' ? kw : Number(kw);
+  if (Number.isNaN(value)) return '— kW';
+  return `${value.toFixed(value % 1 === 0 ? 0 : 1)} kW`;
+}
+
+/**
  * Format a distance in meters. Below 1 km we render meters with no
  * decimal; from 1 km up we render kilometers with 1 decimal.
  *

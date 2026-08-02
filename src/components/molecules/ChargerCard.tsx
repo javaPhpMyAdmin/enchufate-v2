@@ -8,6 +8,7 @@ import { Icon } from '@/components/atoms/Icon';
 import { StatusPill, type StatusPillKind } from '@/components/atoms/StatusPill';
 import { useResolvedAddress } from '@/features/chargers/hooks/useResolvedAddress';
 import { useChargingTimer } from '@/hooks/useChargingTimer';
+import { formatPower } from '@/lib/format';
 import { colors, spacing, typography } from '@/theme';
 
 export interface ChargerCardProps {
@@ -97,10 +98,6 @@ export function ChargerCard({
       </View>
     </Card>
   );
-}
-
-function formatPower(kw: number): string {
-  return `${kw.toFixed(kw % 1 === 0 ? 0 : 1)} kW`;
 }
 
 const styles = StyleSheet.create({

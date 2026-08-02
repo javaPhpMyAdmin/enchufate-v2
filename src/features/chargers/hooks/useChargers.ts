@@ -64,7 +64,9 @@ function haversine(
 function normalizeToMapCharger(c: Charger): MapCharger {
   const connector: ConnectorInfo = {
     type: c.connector_type,
-    power_kw: c.power_kw,
+    // PostgREST serializes numeric(6,2) as a JSON string ("22.00");
+    // coerce so the map renders numbers and Math.max comparisons work.
+    power_kw: Number(c.power_kw),
     count: 1,
   };
   return {

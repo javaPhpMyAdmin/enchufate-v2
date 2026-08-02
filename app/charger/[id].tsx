@@ -68,7 +68,7 @@ import { useCreateReservation } from '@/features/reservations/hooks/useCreateRes
 import { useChargerRating } from '@/features/reviews/hooks/useChargerRating';
 import { ReviewsSection } from '@/features/reviews/components/ReviewsSection';
 import { isFeatureEnabled } from '@/lib/features';
-import { formatPrice } from '@/lib/format';
+import { formatPower, formatPrice } from '@/lib/format';
 import { colors, radius, spacing, typography } from '@/theme';
 
 const PLACEHOLDER_PHOTO = require('@/../assets/icons/cargador.png');
@@ -115,7 +115,7 @@ export default function ChargerDetailScreen() {
     const shareAddr = isCoordinateAddress(data.address)
       ? await reverseGeocode(data.lat, data.lng)
       : data.address;
-    const message = `🔌 Encontré un cargador en Enchúfate:\n\n${data.title}\n📍 ${shareAddr}\n⚡ ${data.power_kw} kW · ${CONNECTOR_LABEL[data.connector_type]}\n💰 ${priceDisplay}/hora\n\n${mapsUrl}`;
+    const message = `🔌 Encontré un cargador en Enchúfate:\n\n${data.title}\n📍 ${shareAddr}\n⚡ ${formatPower(data.power_kw)} · ${CONNECTOR_LABEL[data.connector_type]}\n💰 ${priceDisplay}/hora\n\n${mapsUrl}`;
     await Share.share({ message }, { dialogTitle: 'Compartir cargador' });
   }, [charger.data]);
 
@@ -256,7 +256,7 @@ export default function ChargerDetailScreen() {
             <View style={styles.infoBadge}>
               <Icon icon={Zap} size="sm" color={colors.primary} />
               <Text style={styles.infoBadgeText}>
-                {`${c.power_kw % 1 === 0 ? c.power_kw : c.power_kw.toFixed(1)} kW · ${CONNECTOR_LABEL[c.connector_type]}`}
+                {`${formatPower(c.power_kw)} · ${CONNECTOR_LABEL[c.connector_type]}`}
               </Text>
             </View>
             <View style={styles.infoBadge}>

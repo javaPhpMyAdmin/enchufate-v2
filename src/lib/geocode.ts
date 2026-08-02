@@ -15,6 +15,9 @@ const COORD_REGEX = /^-?\d{1,3}\.\d{2,8}\s*,\s*-?\d{1,3}\.\d{2,8}$/;
  * instead of a human-readable street address.
  */
 export function isCoordinateAddress(address: string): boolean {
+  // Callers can pass undefined (e.g. an optional charger field);
+  // guard so a non-string never throws on .trim().
+  if (typeof address !== 'string') return false;
   return COORD_REGEX.test(address.trim());
 }
 

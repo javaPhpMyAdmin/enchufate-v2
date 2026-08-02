@@ -10,6 +10,7 @@ import { StatusPill, type StatusPillKind } from '@/components/atoms/StatusPill';
 import { useResolvedAddress } from '@/features/chargers/hooks/useResolvedAddress';
 import { useChargingTimer } from '@/hooks/useChargingTimer';
 import { isFeatureEnabled } from '@/lib/features';
+import { formatPower } from '@/lib/format';
 import { colors, spacing, typography } from '@/theme';
 
 export type ReservationRole = 'renter' | 'host';
@@ -174,11 +175,6 @@ export function ReservationCard({
       ) : null}
     </Card>
   );
-}
-
-function formatPower(kw: number | undefined | null): string {
-  if (kw == null) return '— kW';
-  return `${kw.toFixed(kw % 1 === 0 ? 0 : 1)} kW`;
 }
 
 const styles = StyleSheet.create({

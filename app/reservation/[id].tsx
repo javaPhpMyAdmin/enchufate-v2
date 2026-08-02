@@ -75,6 +75,7 @@ import {
   type ReservationStatus,
 } from '@/features/reservations/types';
 import { isFeatureEnabled } from '@/lib/features';
+import { formatPower } from '@/lib/format';
 import { colors, radius, spacing, typography } from '@/theme';
 
 export default function ReservationDetailScreen() {
@@ -496,10 +497,6 @@ export default function ReservationDetailScreen() {
 /* ------------------------------------------------------------------ */
 /* Helpers                                                              */
 /* ------------------------------------------------------------------ */
-
-function formatPower(kw: number): string {
-  return `${kw.toFixed(kw % 1 === 0 ? 0 : 1)} kW`;
-}
 
 /* ------------------------------------------------------------------ */
 /* Styles                                                               */
