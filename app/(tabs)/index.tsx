@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MapPin, Search, Zap } from 'lucide-react-native';
 
 import { Card } from '@/components/atoms/Card';
+import { TAB_BAR_HEIGHT } from '@/lib/tabBar';
 import { colors, radius, spacing, typography } from '@/theme';
 
 export default function InicioTab() {
@@ -30,7 +31,9 @@ export default function InicioTab() {
         styles.content,
         {
           paddingTop: insets.top + spacing.lg,
-          paddingBottom: insets.bottom + spacing.xl,
+          // The tab screen fills the full window height; TAB_BAR_HEIGHT
+          // clears the native tab bar that floats above the content.
+          paddingBottom: TAB_BAR_HEIGHT + insets.bottom + spacing.xl,
         },
       ]}
     >

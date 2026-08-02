@@ -7,7 +7,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -97,16 +96,12 @@ function haversineMeters(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Native tab bar height above the safe-area inset. The sheet is
-// rendered inline in the map screen, so @gorhom/bottom-sheet measures
-// the full window height; bottomInset lifts the sheet's bottom edge
-// above the real UITabBar (iOS ~49pt) / BottomNavigationView
-// (Android ~80dp).
-const TAB_BAR_HEIGHT = Platform.select({
-  ios: 49,
-  android: 80,
-  default: 56,
-});
+// The sheet is rendered inline in the map screen. With NativeTabs the
+// screen already ends above the real tab bar (UITabBar on iOS,
+// BottomNavigationView on Android), so bottomInset only needs the
+// device safe-area inset — adding TAB_BAR_HEIGHT would float the sheet
+// mid-screen. TAB_BAR_HEIGHT lives in src/lib/tabBar.ts for screens
+// that DO extend under the bar (e.g. index.tsx scroll padding).
 
 // ── Component ────────────────────────────────────────────────
 export function ChargerBottomSheet({
@@ -162,7 +157,7 @@ export function ChargerBottomSheet({
       <BottomSheet
         index={0}
         snapPoints={['60%']}
-        bottomInset={insets.bottom + TAB_BAR_HEIGHT}
+        bottomInset={insets.bottom}
         enablePanDownToClose
         onClose={onDismiss}
       >

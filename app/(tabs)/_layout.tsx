@@ -19,18 +19,17 @@ const iconFamily = MaterialCommunityIcons;
 export default function TabsLayout() {
   return (
     <NativeTabs
-      backgroundColor={colors.surfaceWarm}
       disableIndicator
-      indicatorColor={colors.surfaceWarm}
       rippleColor={colors.border}
-      iconColor={{ default: colors.textPrimary, selected: colors.primary }}
+      tintColor={colors.primary}
+      iconColor={{ default: colors.tabInactive, selected: colors.primary }}
       labelStyle={{
-        default: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
+        default: { fontSize: 13, fontWeight: '700', color: colors.tabInactive },
         selected: { fontSize: 13, fontWeight: '700', color: colors.primary },
       }}
     >
       <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.TabBar backgroundColor={colors.surfaceWarm} />
+        <NativeTabs.Trigger.TabBar />
         <Label>Inicio</Label>
         <Icon
           sf="house.fill"
@@ -38,7 +37,7 @@ export default function TabsLayout() {
         />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="map">
-        <NativeTabs.Trigger.TabBar backgroundColor={colors.surfaceWarm} />
+        <NativeTabs.Trigger.TabBar />
         <Label>Mapa</Label>
         <Icon
           sf="map.fill"
@@ -46,7 +45,7 @@ export default function TabsLayout() {
         />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="messages">
-        <NativeTabs.Trigger.TabBar backgroundColor={colors.surfaceWarm} />
+        <NativeTabs.Trigger.TabBar />
         <Label>Mensajes</Label>
         <Icon
           sf="message.fill"
@@ -54,7 +53,7 @@ export default function TabsLayout() {
         />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="reservations">
-        <NativeTabs.Trigger.TabBar backgroundColor={colors.surfaceWarm} />
+        <NativeTabs.Trigger.TabBar />
         <Label>Reservas</Label>
         <Icon
           sf="calendar"
@@ -62,7 +61,7 @@ export default function TabsLayout() {
         />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
-        <NativeTabs.Trigger.TabBar backgroundColor={colors.surfaceWarm} />
+        <NativeTabs.Trigger.TabBar />
         <Label>Perfil</Label>
         <Icon
           sf="person.fill"

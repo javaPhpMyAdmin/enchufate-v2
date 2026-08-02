@@ -39,6 +39,13 @@ export const colors = {
   infoBg: '#DBEAFE',
   infoText: '#1E3A8A',
 
+  // Tab bar inactive items — soft gray-blue
+  /**
+   * Inactive tab item (icon + label) on iOS/Android native tab bars.
+   * iOS systemGray (#8E8E93) so inactive tabs read as gray, never black.
+   */
+  tabInactive: '#8E8E93',
+
   // Charging status — visual indicator for active charging
   charging: '#E87D2F',
 } as const;
