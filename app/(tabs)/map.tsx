@@ -151,6 +151,18 @@ export default function MapTab() {
   const [showLocationToast, setShowLocationToast] = useState(false);
   const router = useRouter();
 
+  // Tracks whether the map tab is the active tab. expo-router does not
+  // re-export useIsFocused, so we derive it from useFocusEffect. The
+  // render gate below unmounts the native MapView while hidden (see
+  // the `!isFocused` check in the main render).
+  const [isFocused, setIsFocused] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      setIsFocused(true);
+      return () => setIsFocused(false);
+    }, []),
+  );
+
   // Cache user position — one GPS fix per session, reused for all route calculations.
   const userPositionRef = useRef<{ lat: number; lng: number } | null>(null);
 
@@ -451,6 +463,18 @@ export default function MapTab() {
   // ── Map still loading ────────────────────────────────────
   if (mapLoading || !MapComponent) {
     return <LoadingState label="Cargando mapa..." />;
+  }
+
+  // ── Tab not focused — unmount the native MapView ─────────
+  // NativeTabs keeps this screen mounted but hidden while the
+  // user is on another tab; the native controller detaches the
+  // MapView's tag, and @rnmapbox/maps' setHandledMapChangedEvents
+  // retries against the stale tag for ~10s then rejects as an
+  // unhandled promise. Unmounting here releases the native view
+  // (remount on focus is acceptable) and the useFocusEffect camera
+  // animation below re-runs once the map is mounted again.
+  if (!isFocused) {
+    return <View style={styles.root} />;
   }
 
   // ── Main render ───────────────────────────────────────────

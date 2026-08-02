@@ -535,12 +535,6 @@ export default function MapContent({
       )}
 
       {/* Recenter FAB — hidden while bottom sheet is open. */}
-      <Mapbox.UserLocation
-        animated={true}
-        androidRenderMode={'gps'}
-        visible={true}
-        showsUserHeadingIndicator={true}
-      />
       {!sheetOpen && (
         <FAB
           onPress={onRecenter}
