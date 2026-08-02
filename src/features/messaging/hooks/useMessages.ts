@@ -16,6 +16,7 @@ import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-q
 
 import { AppError, normalizeSupabaseError } from '@/lib/error';
 import { isFeatureEnabled } from '@/lib/features';
+import { uniqueChannelId } from '@/lib/realtime';
 import { supabase } from '@/lib/supabase';
 
 import type { Message } from '../types';
@@ -40,12 +41,20 @@ export function useMessages(
   // conversation. New messages are pushed into the cache (append)
   // so the optimistic message from useSendMessage is deduped by
   // id at render time.
+  //
+  // The channel name embeds `uniqueChannelId()` so every effect run
+  // registers a brand-new channel. `supabase.channel(name)` returns an
+  // already-subscribed channel when the name is reused, and calling
+  // `.on(...)` on it throws "cannot add `postgres_changes` callbacks
+  // ... after `subscribe()`". The name must stay unique because this
+  // effect re-runs (React StrictMode double-invoke in dev, or
+  // `conversationId` changing when the user navigates conversations).
   useEffect(() => {
     if (!conversationId || !isFeatureEnabled('CHAT')) return;
     if (!supabase) return;
 
     const channel = supabase
-      .channel(`messages:conv=${conversationId}`)
+      .channel(`messages:conv=${conversationId}:${uniqueChannelId()}`)
       .on(
         'postgres_changes',
         {

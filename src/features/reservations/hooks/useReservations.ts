@@ -11,7 +11,8 @@
  *     default).
  *   - When the MOCK_SUPABASE flag is OFF (real mode), the hook
  *     subscribes to a Supabase Realtime channel
- *     (`reservations:user={uid}`) on mount and invalidates the
+ *     (`reservations:user={uid}` + unique suffix, see below) on
+ *     mount and invalidates the
  *     `['reservations']` cache on any `*` change. Cleanup:
  *     `supabase.removeChannel(channel)` on unmount.
  *   - The filter covers BOTH the renter and host paths because
@@ -31,6 +32,7 @@ import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-q
 
 import { AppError } from '@/lib/error';
 import { isFeatureEnabled } from '@/lib/features';
+import { uniqueChannelId } from '@/lib/realtime';
 import { supabase } from '@/lib/supabase';
 
 import { MOCK_RESERVATIONS } from '../data/mockReservations';
@@ -65,12 +67,20 @@ export function useReservations(
   // because the role filter is client-side — the server-side
   // payload doesn't tell us which tab (renter / host) the
   // change belongs to.
+  //
+  // The channel name embeds `uniqueChannelId()` so every effect run
+  // registers a brand-new channel. `supabase.channel(name)` returns an
+  // already-subscribed channel when the name is reused, and calling
+  // `.on(...)` on it throws "cannot add `postgres_changes` callbacks
+  // ... after `subscribe()`". The name must stay unique because this
+  // effect re-runs (React StrictMode double-invoke in dev, or `userId`
+  // changing — e.g. from a mock id to the real UUID after login).
   useEffect(() => {
     if (!userId || isMockSupabase() || !isFeatureEnabled('RESERVATIONS')) {
       return;
     }
     const channel = supabase
-      .channel(`reservations:user=${userId}`)
+      .channel(`reservations:user=${userId}:${uniqueChannelId()}`)
       .on(
         'postgres_changes',
         {
