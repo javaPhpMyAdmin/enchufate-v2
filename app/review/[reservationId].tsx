@@ -32,6 +32,7 @@ import { ErrorState } from '@/components/molecules/ErrorState';
 import { LoadingState } from '@/components/molecules/LoadingState';
 import { useCreateReview } from '@/features/reviews/hooks/useCreateReview';
 import { useReviewEligibility } from '@/features/reviews/hooks/useReviewEligibility';
+import { useResolvedAddress } from '@/features/chargers/hooks/useResolvedAddress';
 import { useReservation } from '@/features/reservations/hooks/useReservation';
 import { isFeatureEnabled } from '@/lib/features';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -53,6 +54,52 @@ export default function ReviewFormScreen() {
 
   const [rating, setRating] = useState(5);
   const [text, setText] = useState('');
+
+  const r = reservation.data;
+
+  // Resolve the charger address to human-readable form. Some chargers
+  // were published before reverse geocoding was reliable, so their
+  // `address` field contains raw coordinates — this hook detects that
+  // and geocodes them. Must live ABOVE the early returns (hooks rule).
+  const resolvedAddress = useResolvedAddress(
+    r?.charger_address ?? '',
+    r?.charger_lat ?? -34.9,
+    r?.charger_lng ?? -56.2,
+  );
+
+  // NOTE: this useCallback lives ABOVE the early returns. Hooks must
+  // run unconditionally on every render — placing them after a return
+  // changes the hook count between renders ("Rendered more hooks than
+  // during the previous render").
+  const handleSubmit = useCallback(async () => {
+    if (!r) return;
+
+    if (rating < 1 || rating > 5) {
+      Alert.alert('Calificación requerida', 'Elegí una calificación del 1 al 5.');
+      return;
+    }
+
+    const trimmedText = text.trim();
+    if (trimmedText.length > MAX_TEXT_LENGTH) {
+      Alert.alert('Texto demasiado largo', `Máximo ${MAX_TEXT_LENGTH} caracteres.`);
+      return;
+    }
+
+    try {
+      await createReview({
+        reservationId: r.id,
+        chargerId: r.charger_id,
+        rating,
+        text: trimmedText.length > 0 ? trimmedText : null,
+      });
+      Alert.alert('¡Reseña enviada!', 'Gracias por tu opinión.', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch {
+      // Error is surfaced via createError below; the Alert in the
+      // parent render will pick it up on the next render cycle.
+    }
+  }, [rating, text, createReview, r, router]);
 
   // --- Feature gate ---
   if (!isFeatureEnabled('CHARGER_REVIEWS')) {
@@ -98,7 +145,7 @@ export default function ReviewFormScreen() {
     );
   }
 
-  if (!reservation.data) {
+  if (!r) {
     return (
       <ErrorState
         title="Reserva no encontrada"
@@ -122,36 +169,6 @@ export default function ReviewFormScreen() {
       </View>
     );
   }
-
-  const r = reservation.data;
-
-  const handleSubmit = useCallback(async () => {
-    if (rating < 1 || rating > 5) {
-      Alert.alert('Calificación requerida', 'Elegí una calificación del 1 al 5.');
-      return;
-    }
-
-    const trimmedText = text.trim();
-    if (trimmedText.length > MAX_TEXT_LENGTH) {
-      Alert.alert('Texto demasiado largo', `Máximo ${MAX_TEXT_LENGTH} caracteres.`);
-      return;
-    }
-
-    try {
-      await createReview({
-        reservationId: r.id,
-        chargerId: r.charger_id,
-        rating,
-        text: trimmedText.length > 0 ? trimmedText : null,
-      });
-      Alert.alert('¡Reseña enviada!', 'Gracias por tu opinión.', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
-    } catch {
-      // Error is surfaced via createError below; the Alert in the
-      // parent render will pick it up on the next render cycle.
-    }
-  }, [rating, text, createReview, r, router]);
 
   return (
     <View style={styles.flex}>
@@ -185,7 +202,7 @@ export default function ReviewFormScreen() {
             {r.charger_title}
           </Text>
           <Text style={styles.chargerAddress} numberOfLines={1}>
-            {r.charger_address}
+            {resolvedAddress.data ?? r.charger_address}
           </Text>
         </Card>
 
