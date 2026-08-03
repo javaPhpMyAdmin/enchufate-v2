@@ -48,10 +48,15 @@ import {
 import { useSession } from '@/features/auth/hooks/useSession';
 import { useEndCharging } from '@/features/reservations/mutations/endCharging';
 import { useReservations } from '@/features/reservations/hooks/useReservations';
-import { isCancellable, otherParty, timeBlock, type Reservation, type ReservationRole } from '@/features/reservations/types';
+import {
+  isCancellable,
+  otherParty,
+  timeBlock,
+  type Reservation,
+  type ReservationRole,
+} from '@/features/reservations/types';
 import { useReviewEligibility } from '@/features/reviews/hooks/useReviewEligibility';
 import { isFeatureEnabled } from '@/lib/features';
-import { formatDateTime } from '@/lib/format';
 import { colors, radius, spacing, typography } from '@/theme';
 
 type SegmentedTab = ReservationRole;
@@ -76,7 +81,9 @@ export default function ReservationsTab() {
       <GuestState
         insetsTop={insets.top}
         insetsBottom={insets.bottom}
-        onLoginPress={() => router.push('/login?returnTo=/reservations' as never)}
+        onLoginPress={() =>
+          router.push('/login?returnTo=/reservations' as never)
+        }
       />
     );
   }
@@ -102,7 +109,10 @@ function GuestState({
       style={[
         styles.flex,
         styles.guest,
-        { paddingTop: insetsTop + spacing.xl, paddingBottom: insetsBottom + spacing.xl },
+        {
+          paddingTop: insetsTop + spacing.xl,
+          paddingBottom: insetsBottom + spacing.xl,
+        },
       ]}
     >
       <View style={styles.guestIcon}>
@@ -156,8 +166,16 @@ function AuthedList({
                 <Skeleton width="40%" height={12} />
                 <Skeleton width="20%" height={12} />
               </View>
-              <Skeleton width="80%" height={18} style={styles.skeletonSpacerSm} />
-              <Skeleton width="60%" height={12} style={styles.skeletonSpacerXs} />
+              <Skeleton
+                width="80%"
+                height={18}
+                style={styles.skeletonSpacerSm}
+              />
+              <Skeleton
+                width="60%"
+                height={12}
+                style={styles.skeletonSpacerXs}
+              />
               <View style={styles.skeletonCardFooter}>
                 <Skeleton width="30%" height={12} />
                 <Skeleton width="20%" height={12} />
@@ -181,7 +199,11 @@ function AuthedList({
       return (
         <EmptyState
           icon={CalendarCheck}
-          title={tab === 'renter' ? 'Todavía no tenés reservas' : 'Sin reservas en tus cargadores'}
+          title={
+            tab === 'renter'
+              ? 'Todavía no tenés reservas'
+              : 'Sin reservas en tus cargadores'
+          }
           body={
             tab === 'renter'
               ? 'Cuando reserves un cargador, lo vas a ver acá.'
@@ -212,11 +234,7 @@ function AuthedList({
   return (
     <View style={[styles.flex, { paddingTop: topInset }]}>
       <View style={styles.segmentedWrap}>
-        <SegmentedControl
-          options={SEGMENTS}
-          value={tab}
-          onChange={setTab}
-        />
+        <SegmentedControl options={SEGMENTS} value={tab} onChange={setTab} />
       </View>
       {renderContent()}
     </View>
@@ -379,7 +397,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
-  guestTitle: { ...typography.title, color: colors.textPrimary, textAlign: 'center' },
+  guestTitle: {
+    ...typography.title,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
   guestBody: {
     ...typography.body,
     color: colors.textSecondary,
@@ -394,9 +416,17 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   signupPrompt: { ...typography.caption, color: colors.textSecondary },
-  signupLink: { ...typography.caption, color: colors.primary, fontWeight: '600' },
+  signupLink: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: '600',
+  },
 
-  segmentedWrap: { paddingHorizontal: spacing.base, paddingTop: spacing.md, paddingBottom: spacing.sm },
+  segmentedWrap: {
+    paddingHorizontal: spacing.base,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+  },
   segmented: {
     flexDirection: 'row',
     backgroundColor: colors.background,
@@ -414,7 +444,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   segmentSelected: { backgroundColor: colors.primary },
-  segmentText: { ...typography.caption, color: colors.textPrimary, fontWeight: '600' },
+  segmentText: {
+    ...typography.caption,
+    color: colors.textPrimary,
+    fontWeight: '600',
+  },
   segmentTextSelected: { color: colors.textOnPrimary },
 
   list: { padding: spacing.base, gap: spacing.sm },
