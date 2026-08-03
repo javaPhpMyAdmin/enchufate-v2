@@ -50,7 +50,6 @@ import { useMessages } from '@/features/messaging/hooks/useMessages';
 import { useSendMessage } from '@/features/messaging/hooks/useSendMessage';
 import { otherParty, type Conversation, type Message } from '@/features/messaging/types';
 import { formatRelativeTime } from '@/lib/format';
-import { supabase } from '@/lib/supabase';
 import { colors, radius, spacing, typography } from '@/theme';
 
 export default function ThreadScreen() {
@@ -87,22 +86,12 @@ export default function ThreadScreen() {
     flatListRef.current?.scrollToEnd({ animated: false });
   }, []);
 
-  // Reset unread count when opening a conversation
-  useEffect(() => {
-    if (!conversationId || !userId || !conversations.data) return;
-    const conv = conversations.data.find((c) => c.id === conversationId);
-    if (!conv) return;
-    const isHost = conv.host_id === userId;
-    const update = isHost
-      ? { host_unread_count: 0 }
-      : { renter_unread_count: 0 };
-    void supabase
-      .from('conversations')
-      .update(update)
-      .eq('id', conversationId);
-  }, [conversationId, userId, conversations.data]);
-
-  // Mark messages as read when conversation opens (fire-and-forget)
+  // Mark messages as read + reset the own unread counter when the
+  // conversation opens (fire-and-forget). `useMarkAsRead` handles
+  // both writes: it stamps `read_at` on the other party's unread
+  // messages and resets the caller's counter on the conversation row.
+  // Both updates are idempotent (`read_at IS NULL` / `counter = 0`),
+  // so re-runs after a session load are harmless no-ops.
   useEffect(() => {
     if (conversationId && userId) {
       void markAsRead();

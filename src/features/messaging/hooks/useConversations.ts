@@ -10,11 +10,19 @@
  * off, the hook returns an empty array and `isLoading` flips to
  * `false` immediately, so the screen can render its empty state
  * without a fetch round-trip.
+ *
+ * Realtime: subscribes to any change on `public.conversations` and
+ * invalidates the `['conversations']` cache, so the unread dot and
+ * the last-message preview stay fresh. RLS scopes the channel to
+ * rows the user can SELECT (their own conversations), so no
+ * user-scoped filter is needed.
  */
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
 import { AppError, normalizeSupabaseError } from '@/lib/error';
 import { isFeatureEnabled } from '@/lib/features';
+import { uniqueChannelId } from '@/lib/realtime';
 import { supabase } from '@/lib/supabase';
 
 import type { Conversation, MessageKind } from '../types';
@@ -31,7 +39,48 @@ export interface UseConversationsResult {
 export function useConversations(
   userId: string | null | undefined,
 ): UseQueryResult<Conversation[], AppError> {
+  const queryClient = useQueryClient();
   const enabled = Boolean(userId) && isFeatureEnabled('CHAT');
+
+  // ----- Realtime subscription -----
+  // Invalidates the conversations cache on any INSERT/UPDATE to
+  // `public.conversations`. Two flows depend on it:
+  //   - the reader's unread reset (`useMarkAsRead` UPDATEs the
+  //     counter to 0) → the list drops the unread dot;
+  //   - every message INSERT bumps `last_message_*` via the
+  //     `update_conversation_last_message` trigger → the list shows
+  //     the new preview and moves the conversation to the top.
+  // RLS filters the channel to rows the caller can SELECT, so a
+  // broad filter (no user-scoped predicate) only delivers events for
+  // the caller's own conversations. We invalidate rather than
+  // `setQueryData` because the payload is a raw row and the cache
+  // stores the denormalized `Conversation` shape.
+  //
+  // The channel name embeds `uniqueChannelId()` — see useMessages
+  // for why (re-registering a used channel name throws).
+  useEffect(() => {
+    if (!userId || !isFeatureEnabled('CHAT')) return;
+    if (!supabase) return;
+
+    const channel = supabase
+      .channel(`conversations:user=${userId}:${uniqueChannelId()}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversations',
+        },
+        () => {
+          void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [userId, queryClient]);
 
   return useQuery<Conversation[], AppError>({
     queryKey: userId ? QUERY_KEY(userId) : ['conversations', 'anonymous'],

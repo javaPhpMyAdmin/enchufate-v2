@@ -16,7 +16,7 @@
  * messaging spec scenario. We do not filter on message body
  * (the spec only requires name filtering).
  */
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -25,7 +25,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Link, useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { Link, useFocusEffect, useRouter } from 'expo-router';
 import { Search, MessageCircle } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -130,7 +131,20 @@ function AuthedList({
 }): React.JSX.Element {
   const router = useRouter();
   const conversations = useConversations(userId);
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
+
+  // Refresh the list every time the tab regains focus. Returning from
+  // a thread after `useMarkAsRead` reset the unread counter (or after
+  // a message send bumped `last_message_*` via the server trigger)
+  // should render the fresh state even if a realtime event was missed
+  // while the list was covered. The realtime subscription in
+  // `useConversations` covers live updates; this is the focus fallback.
+  useFocusEffect(
+    useCallback(() => {
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    }, [queryClient]),
+  );
 
   const filtered = useMemo(() => {
     const list = conversations.data ?? [];
