@@ -225,7 +225,8 @@ function AuthedList({
             onPress={() => router.push(`/reservation/${item.id}` as never)}
           />
         )}
-        contentContainerStyle={styles.list}
+        style={styles.listFill}
+        contentContainerStyle={[styles.list, styles.listFillContent]}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
     );
@@ -452,6 +453,13 @@ const styles = StyleSheet.create({
   segmentTextSelected: { color: colors.textOnPrimary },
 
   list: { padding: spacing.base, gap: spacing.sm },
+  // Constrain the FlatList to the remaining screen height (Android
+  // Yoga quirk: an unconstrained ScrollView sizes to its content and
+  // gets clipped, so the list never scrolls). `listFill` caps the
+  // height; `listFillContent` keeps the content container filling the
+  // viewport even when the list is short.
+  listFill: { flex: 1 },
+  listFillContent: { flexGrow: 1 },
   separator: { height: spacing.sm },
 
   // ----- Skeleton (loading) -----
