@@ -34,7 +34,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, Send } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -64,10 +65,16 @@ export default function ThreadScreen() {
   const messages = useMessages(conversationId);
   const sendMessage = useSendMessage(conversationId ?? 'noop', userId);
   const { markAsRead } = useMarkAsRead(conversationId);
+  const queryClient = useQueryClient();
 
   const [text, setText] = useState('');
   const [kbHeight, setKbHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+  // Id of the newest foreign (not-mine) message that already triggered
+  // a read-receipt stamp. Seeded on initial load; changed only when a
+  // NEW foreign message arrives so the watcher below never re-stamps
+  // for the same message (and never loops on the read_at cache merge).
+  const stampedForeignIdRef = useRef<string | null>(null);
 
   // Android: track keyboard height so we can push the composer up
   useEffect(() => {
@@ -97,6 +104,52 @@ export default function ThreadScreen() {
       void markAsRead();
     }
   }, [conversationId, userId, markAsRead]);
+
+  // Re-arm the stamp when foreign messages arrive while the thread
+  // stays open (read receipts for the dominant flow: the recipient
+  // keeps the thread open and the other party writes). Without this,
+  // nothing re-stamps `read_at` and the sender would see a single
+  // tick forever; the server-side unread counter also re-increments
+  // on insert, so the badge would reappear.
+  //
+  // The first run only seeds `stampedForeignIdRef` (the mount effect
+  // above already stamped everything on open). Later, a NEW foreign
+  // message id re-arms a debounced (300 ms, trailing edge) stamp —
+  // rapid-fire arrivals reset the timer, and the idempotent reset
+  // makes the eventual call a server-side no-op if it races the
+  // realtime cache merge.
+  useEffect(() => {
+    if (!conversationId || !userId || !messages.data) return;
+    const foreign = messages.data.filter(
+      (m) => m.sender_id !== null && m.sender_id !== userId,
+    );
+    const newest = foreign[foreign.length - 1];
+    if (!newest) return;
+
+    if (stampedForeignIdRef.current === null) {
+      stampedForeignIdRef.current = newest.id;
+      return;
+    }
+    if (stampedForeignIdRef.current === newest.id) return;
+
+    stampedForeignIdRef.current = newest.id;
+    const timer = setTimeout(() => {
+      void markAsRead();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [messages.data, userId, conversationId, markAsRead]);
+
+  // Focus fallback: refetch the thread when the screen regains focus
+  // (mirrors the messages list). Covers realtime gaps — e.g. missed
+  // UPDATE events after a reconnect — and re-syncs the conversations
+  // cache so the unread counter shown on the list is fresh.
+  useFocusEffect(
+    useCallback(() => {
+      if (!conversationId) return;
+      void queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    }, [conversationId, queryClient]),
+  );
 
   if (sessionLoading) {
     return <LoadingState />;
@@ -185,7 +238,11 @@ export default function ThreadScreen() {
       {/* Message list — chronological order, auto-scrolls to bottom on load and send */}
       {messages.isLoading ? (
         <LoadingState label="Cargando mensajes..." />
-      ) : messages.error ? (
+      ) : messages.error && !messages.data ? (
+        // Full error state only when there is nothing to show. A
+        // failed background refetch (e.g. the focus fallback above)
+        // keeps `data` and sets `error` — render the stale thread
+        // instead of replacing it with an error screen.
         <ErrorState
           body={messages.error.userMessage}
           onRetry={() => messages.refetch()}
