@@ -169,34 +169,31 @@ function AuthedList({
     }, [queryClient]),
   );
 
+  // Shared skeleton — rendered on first load (`isLoading`) and while
+  // a background refetch keeps the list empty (empty-state flash
+  // guard below).
+  const skeletonList = (
+    <View style={styles.skeletonList}>
+      {Array.from({ length: 3 }).map((_, i) => (
+        <View key={i} style={styles.skeletonCard}>
+          <View style={styles.skeletonCardHeader}>
+            <Skeleton width="40%" height={12} />
+            <Skeleton width="20%" height={12} />
+          </View>
+          <Skeleton width="80%" height={18} style={styles.skeletonSpacerSm} />
+          <Skeleton width="60%" height={12} style={styles.skeletonSpacerXs} />
+          <View style={styles.skeletonCardFooter}>
+            <Skeleton width="30%" height={12} />
+            <Skeleton width="20%" height={12} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+
   const renderContent = () => {
     if (reservations.isLoading) {
-      return (
-        <View style={styles.skeletonList}>
-          {Array.from({ length: 3 }).map((_, i) => (
-            <View key={i} style={styles.skeletonCard}>
-              <View style={styles.skeletonCardHeader}>
-                <Skeleton width="40%" height={12} />
-                <Skeleton width="20%" height={12} />
-              </View>
-              <Skeleton
-                width="80%"
-                height={18}
-                style={styles.skeletonSpacerSm}
-              />
-              <Skeleton
-                width="60%"
-                height={12}
-                style={styles.skeletonSpacerXs}
-              />
-              <View style={styles.skeletonCardFooter}>
-                <Skeleton width="30%" height={12} />
-                <Skeleton width="20%" height={12} />
-              </View>
-            </View>
-          ))}
-        </View>
-      );
+      return skeletonList;
     }
     if (reservations.error) {
       return (
@@ -209,6 +206,15 @@ function AuthedList({
     }
     const list = reservations.data ?? [];
     if (list.length === 0) {
+      // Empty-state flash guard: a background refetch (cold-start
+      // cache rehydration, or the 30s realtime-outage fallback) can
+      // leave `data` temporarily empty while `isLoading` is already
+      // false. Keep the skeleton up until the refetch settles so
+      // "Todavía no tenés reservas" doesn't flash before fresh data
+      // arrives.
+      if (reservations.isFetching && !reservations.isLoading) {
+        return skeletonList;
+      }
       return (
         <EmptyState
           icon={CalendarCheck}
