@@ -181,7 +181,12 @@ function AuthedList({
     );
   }
 
-  if (conversations.error) {
+  // Full error state only when there is nothing to show. The
+  // every-focus invalidate above makes a transient refetch failure
+  // likely; with cached data present TanStack keeps `data` and sets
+  // `error`, so we render the stale list with a non-blocking hint
+  // instead of replacing it with an error screen.
+  if (conversations.error && !conversations.data) {
     return (
       <ErrorState
         body={conversations.error.userMessage}
@@ -211,6 +216,13 @@ function AuthedList({
   return (
     <View style={[styles.flex, { paddingTop: topInset }]}>
       <SearchBar value={query} onChangeText={setQuery} />
+      {conversations.isRefetchError && filtered.length > 0 ? (
+        <View style={styles.refetchHint}>
+          <Text style={styles.refetchHintText}>
+            No pudimos actualizar la lista. Mostrando datos previos.
+          </Text>
+        </View>
+      ) : null}
       <FlatList
         data={filtered}
         keyExtractor={(c) => c.id}
@@ -377,6 +389,21 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textPrimary,
     paddingVertical: 0,
+  },
+
+  /* Non-blocking hint shown when a background refetch failed but
+     stale data is still on screen. */
+  refetchHint: {
+    marginHorizontal: spacing.base,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.input,
+    backgroundColor: colors.primarySubtle,
+  },
+  refetchHintText: {
+    ...typography.caption,
+    color: colors.textSecondary,
   },
 
   list: { paddingVertical: spacing.sm },

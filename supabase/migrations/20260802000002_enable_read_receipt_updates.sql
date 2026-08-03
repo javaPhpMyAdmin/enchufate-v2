@@ -28,17 +28,24 @@
 --       means "the other party saw this", so only the recipient may
 --       set it. System messages (`sender_id IS NULL`) are stampable
 --       by either participant.
+--     - BEFORE UPDATE guard trigger: refuses any change beyond
+--       `read_at` (defense-in-depth on top of the column grant, so a
+--       future migration that grants a new column does not silently
+--       widen the surface) and forces the stamp to the server's
+--       `now()` — a client-supplied timestamp is never trusted.
 --
 --   `conversations`:
 --     - RLS UPDATE policy restricted to participants.
 --     - Column privilege: `authenticated` may ONLY update the two
 --       unread counters (table-level UPDATE revoked).
 --     - BEFORE UPDATE guard trigger: each participant may change ONLY
---       their OWN counter, to a non-negative value; every other column
---       must be untouched. System-managed updates (the SECURITY
---       DEFINER triggers that maintain `last_message_*` and increment
---       the counters) run nested — `pg_trigger_depth() > 1` — and skip
---       the guard.
+--       their OWN counter, to a non-negative value no greater than
+--       the current one (decrement/reset only — a participant can
+--       never inflate their own badge); every other column must be
+--       untouched. System-managed updates (the SECURITY DEFINER
+--       triggers that maintain `last_message_*` and increment the
+--       counters) run nested — `pg_trigger_depth() > 1` — and skip
+--       both guards.
 --
 -- The SECURITY DEFINER trigger functions (`update_conversation_last_message`,
 -- `handle_reservation_*`) execute with their owner's privileges and
@@ -78,6 +85,49 @@ create policy "messages_update_read_at"
 -- column without a grant — and future columns are fail-closed.
 revoke update on public.messages from anon, authenticated;
 grant update (read_at) on public.messages to authenticated;
+
+-- BEFORE UPDATE guard on messages. Two jobs:
+--   1. Refuse any change beyond `read_at` — defense-in-depth on top
+--      of the column grant, so a future migration that grants UPDATE
+--      on a new column cannot silently widen the client write
+--      surface.
+--   2. Force a server-authoritative stamp: `read_at` is set to the
+--      database's `now()`, ignoring whatever timestamp the client
+--      supplied (clients cannot fake when a message was read).
+-- System-managed updates (trigger chains) bypass the guard via
+-- `pg_trigger_depth() > 1`, mirroring the conversations guard below.
+create or replace function public.guard_messages_read_at_update()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  -- System-managed updates (trigger chains) bypass the guard.
+  if pg_trigger_depth() > 1 then
+    return new;
+  end if;
+
+  -- Only read_at may change.
+  if old.id is distinct from new.id
+     or old.conversation_id is distinct from new.conversation_id
+     or old.sender_id is distinct from new.sender_id
+     or old.body is distinct from new.body
+     or old.kind is distinct from new.kind
+     or old.created_at is distinct from new.created_at then
+    raise exception 'message update denied: participants may only update read_at';
+  end if;
+
+  -- Server-authoritative stamp: ignore the client-supplied value.
+  new.read_at := now();
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_messages_guard_read_at_update on public.messages;
+create trigger trg_messages_guard_read_at_update
+  before update on public.messages
+  for each row execute function public.guard_messages_read_at_update();
 
 -- -------------------------------------------------------------------------
 -- 2. conversations — participant-only reset of their OWN unread counter
@@ -127,15 +177,19 @@ begin
   end if;
 
   -- Each participant may only change their OWN counter, to a
-  -- non-negative value. The other side's counter must be untouched.
+  -- non-negative value no greater than the current one (decrement /
+  -- reset only — a participant can never inflate their own badge).
+  -- The other side's counter must be untouched.
   if auth.uid() = old.renter_id then
     if old.host_unread_count is distinct from new.host_unread_count
-       or new.renter_unread_count < 0 then
+       or new.renter_unread_count < 0
+       or new.renter_unread_count > old.renter_unread_count then
       raise exception 'conversation update denied: renter may only reset renter_unread_count';
     end if;
   elsif auth.uid() = old.host_id then
     if old.renter_unread_count is distinct from new.renter_unread_count
-       or new.host_unread_count < 0 then
+       or new.host_unread_count < 0
+       or new.host_unread_count > old.host_unread_count then
       raise exception 'conversation update denied: host may only reset host_unread_count';
     end if;
   else
