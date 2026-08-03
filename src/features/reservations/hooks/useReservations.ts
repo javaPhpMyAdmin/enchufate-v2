@@ -9,26 +9,28 @@
  *   - The mock fetch path is preserved (the user hasn't applied
  *     the SQL migrations yet + the MOCK_SUPABASE flag is on by
  *     default).
- *   - When the MOCK_SUPABASE flag is OFF (real mode), the hook
+ *  - When the MOCK_SUPABASE flag is OFF (real mode), the hook
  *     subscribes to a Supabase Realtime channel
  *     (`reservations:user={uid}` + unique suffix, see below) on
  *     mount and invalidates the
  *     `['reservations']` cache on any `*` change. Cleanup:
  *     `supabase.removeChannel(channel)` on unmount.
- *   - The filter covers BOTH the renter and host paths because
- *     the channel listens to all `reservations` events for the
- *     signed-in user — renter-side matches `renter_id=eq.{uid}`,
- *     host-side matches `charger_id=in.{owned_ids}` (computed
- *     via the `my-chargers` cache, which the Profile screen
- *     keeps warm). For Phase 7 we use the simpler renter-side
- *     filter on the renter tab; the host tab refreshes on
- *     focus. Phase 8 can wire the full two-sided filter.
+ *  - The filter covers BOTH the renter and host paths with a
+ *    two-sided `or(...)` filter: `renter_id = eq.{uid}` covers the
+ *    renter side; `charger_id = in.(owned_ids)` covers the host
+ *    side (owned ids resolved from `chargers.owner_id` — the
+ *    reservations table has no host column). Re-subscribing on
+ *    `role` change keeps the owned-charger set fresh. Before this
+ *    fix the channel only listened to the renter side, so host-side
+ *    events (guest books/cancels on the host's charger) never
+ *    invalidated the host tab.
  *   - The real-mode SELECT path is left as a TODO — the user
  *     wires the SELECT chain when they flip the flag + run
  *     `supabase gen types typescript`.
  */
 import { useEffect } from 'react';
 import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import { AppError } from '@/lib/error';
 import { isFeatureEnabled } from '@/lib/features';
@@ -60,13 +62,21 @@ export function useReservations(
   const enabled = Boolean(userId) && isFeatureEnabled('RESERVATIONS');
 
   // ----- Realtime subscription (real mode only) -----
-  // The mock path keeps the `staleTime: 15_000` cache. The
-  // real path subscribes to the `reservations:user={uid}`
-  // channel and invalidates the `['reservations']` cache on
-  // any change. We invalidate rather than setQueryData
-  // because the role filter is client-side — the server-side
-  // payload doesn't tell us which tab (renter / host) the
-  // change belongs to.
+  // The mock path keeps the `staleTime: 15_000` cache. The real
+  // path subscribes to a TWO-SIDED `postgres_changes` filter so
+  // events on BOTH sides of the reservation invalidate the cache:
+  //   - renter side: `renter_id = eq.{uid}`
+  //   - host side:   `charger_id = in.(owned ids)` — the user's
+  //     chargers, resolved once per subscription from
+  //     `chargers.owner_id` (the reservations table has no host
+  //     column). Degrades to renter-only when the user owns no
+  //     chargers.
+  // `role` is in the effect deps so switching the segmented tab
+  // re-subscribes and re-resolves the owned-charger set (a host may
+  // publish new chargers between visits). We invalidate rather than
+  // setQueryData because the server-side payload doesn't tell us
+  // which tab (renter / host) the change belongs to — the role
+  // filter is client-side in the queryFn.
   //
   // The channel name embeds `uniqueChannelId()` so every effect run
   // registers a brand-new channel. `supabase.channel(name)` returns an
@@ -74,35 +84,57 @@ export function useReservations(
   // `.on(...)` on it throws "cannot add `postgres_changes` callbacks
   // ... after `subscribe()`". The name must stay unique because this
   // effect re-runs (React StrictMode double-invoke in dev, or `userId`
-  // changing — e.g. from a mock id to the real UUID after login).
+  // / `role` changing).
   useEffect(() => {
     if (!userId || isMockSupabase() || !isFeatureEnabled('RESERVATIONS')) {
       return;
     }
-    const channel = supabase
-      .channel(`reservations:user=${userId}:${uniqueChannelId()}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'reservations',
-          filter: `renter_id=eq.${userId}`,
-        },
-        () => {
-          // Invalidate the broad key so both the renter + host
-          // tabs refetch on the next render. The renter tab is
-          // the one subscribed; the host tab refetches on its
-          // own useReservations call (separate hook instance).
-          void queryClient.invalidateQueries({ queryKey: ['reservations'] });
-        },
-      )
-      .subscribe();
+    const uid: string = userId;
+    let cancelled = false;
+    let channel: RealtimeChannel | null = null;
+
+    // The host-side half of the filter needs the user's charger ids.
+    // Resolve them before subscribing; if the user owns no chargers
+    // yet, the filter degrades to the renter-only half.
+    void (async () => {
+      const { data: chargers } = await supabase
+        .from('chargers')
+        .select('id')
+        .eq('owner_id', uid);
+      if (cancelled) return;
+
+      const ownedIds = (chargers ?? []).map((c) => c.id);
+      const filter =
+        ownedIds.length > 0
+          ? `or=(renter_id.eq.${uid},charger_id.in.(${ownedIds.join(',')}))`
+          : `renter_id.eq.${uid}`;
+
+      channel = supabase
+        .channel(`reservations:user=${uid}:${uniqueChannelId()}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'reservations',
+            filter,
+          },
+          () => {
+            // Invalidate the broad key so both the renter + host
+            // tabs refetch on the next render.
+            void queryClient.invalidateQueries({ queryKey: ['reservations'] });
+          },
+        )
+        .subscribe();
+    })();
 
     return () => {
-      void supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) {
+        void supabase.removeChannel(channel);
+      }
     };
-  }, [userId, queryClient]);
+  }, [userId, role, queryClient]);
 
   return useQuery<Reservation[], AppError>({
     queryKey: userId ? QUERY_KEY(userId, role) : ['reservations', role, 'anonymous'],

@@ -19,8 +19,8 @@
  * - `refetchOnWindowFocus: false` — Expo/RN apps don't have a
  *   well-defined "window focus" event; the default `true` causes
  *   spurious refetches when the user backgrounds and resumes the
- *   app. The pattern in `useReservations` and `useConversations` is
- *   to refetch on `useFocusEffect()` from `expo-router` instead.
+ *   app. The screens (`messages.tsx`, `reservations.tsx`) refetch
+ *   on `useFocusEffect()` from `expo-router` instead.
  *
  * TanStack Query v5 typing: we extend `QueryClientConfig` so callers
  * get autocomplete on the `defaultOptions` shape.

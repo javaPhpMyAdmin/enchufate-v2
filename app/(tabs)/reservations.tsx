@@ -21,7 +21,7 @@
  *
  * Tapping a card navigates to `/reservation/[id]`.
  */
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -30,7 +30,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Link, useRouter } from 'expo-router';
+import { Link, useFocusEffect, useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { CalendarCheck } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -155,6 +156,18 @@ function AuthedList({
   const router = useRouter();
   const [tab, setTab] = useState<SegmentedTab>('renter');
   const reservations = useReservations(tab, userId);
+  const queryClient = useQueryClient();
+
+  // Refresh the list every time the tab regains focus (mirrors the
+  // messages tab pattern). The realtime subscription in
+  // `useReservations` covers live updates; this is the fallback for
+  // changes that happened while the screen was covered (e.g. an
+  // event delivered before the channel was (re)subscribed).
+  useFocusEffect(
+    useCallback(() => {
+      void queryClient.invalidateQueries({ queryKey: ['reservations'] });
+    }, [queryClient]),
+  );
 
   const renderContent = () => {
     if (reservations.isLoading) {
