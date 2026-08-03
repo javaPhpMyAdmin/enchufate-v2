@@ -34,17 +34,22 @@
  *     console so a developer can confirm the right flags are on for
  *     the build. The actual gating happens in each feature hook
  *     (`isFeatureEnabled('CHAT')` etc.) per the no-React-Context rule.
- *   - **Query persister** — mirrors the TanStack Query cache into
+ *  - **Query persister** — mirrors the TanStack Query cache into
  *     `AsyncStorage` for 24h so the messaging / reservation lists
  *     rehydrate on the first render after a cold start. The persister
  *     lives in `src/lib/queryPersister.ts`; the wiring is the only
  *     line of code the layout owns.
+ *  - **Push response listener** — taps on reservation pushes
+ *     navigate to `/reservation/[id]` (warm + cold start). Wired
+ *     here next to `useRegisterPushToken`; both are gated by
+ *     `PUSH_NOTIFICATIONS`.
  */
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { persistQueryClient } from '@tanstack/query-persist-client-core';
 import { Asset } from 'expo-asset';
-import { Stack } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -66,6 +71,46 @@ export default function RootLayout() {
   // individual screens, not the layout.
   useSession();
   useRegisterPushToken();
+
+  // ----- Push response listener (notification deep links) -----
+  // Registered once at the root layout — the same lifecycle as the
+  // push token registration. Tapping a reservation push navigates to
+  // `/reservation/[id]` using the `data` payload sent by `send-push`
+  // (`{ type: 'reservation', reservationId }`). Gated by the same
+  // feature flag that gates token registration.
+  useEffect(() => {
+    if (!isFeatureEnabled('PUSH_NOTIFICATIONS')) return;
+
+    const handleResponse = (response: Notifications.NotificationResponse) => {
+      const data = response.notification.request.content.data;
+      if (
+        data?.type === 'reservation' &&
+        typeof data.reservationId === 'string'
+      ) {
+        router.push({
+          pathname: '/reservation/[id]',
+          params: { id: data.reservationId },
+        });
+      }
+    };
+
+    // Cold start: when the app is launched from a notification tap
+    // the response is not re-delivered to the listener, so read the
+    // last one. Clear it afterwards so a later remount (e.g. HMR)
+    // doesn't re-navigate to the same reservation.
+    const lastResponse = Notifications.getLastNotificationResponse();
+    if (lastResponse) {
+      handleResponse(lastResponse);
+      Notifications.clearLastNotificationResponse();
+    }
+
+    const subscription =
+      Notifications.addNotificationResponseReceivedListener(handleResponse);
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   // ----- Boot side effects (Phase 8 polish) -----
   useEffect(() => {

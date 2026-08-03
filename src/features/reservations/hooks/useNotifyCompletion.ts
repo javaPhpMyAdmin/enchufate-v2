@@ -72,6 +72,8 @@ export function useNotifyCompletion(reservation: Reservation | undefined): void 
       [reservation.renter_id],
       'Reserva completada',
       `¿Cómo fue tu carga en ${chargerTitle}? Dejanos tu reseña`,
+      undefined,
+      { type: 'reservation', reservationId: reservation.id },
     );
   }, [reservation]);
 }

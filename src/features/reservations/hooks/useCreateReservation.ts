@@ -131,6 +131,8 @@ export function useCreateReservation(): UseCreateReservationResult {
                 [charger.owner_id],
                 'Nueva reserva',
                 `Alguien quiere reservar tu cargador "${charger.title}".`,
+                undefined,
+                { type: 'reservation', reservationId: _data.reservationId },
               );
             }
           })();

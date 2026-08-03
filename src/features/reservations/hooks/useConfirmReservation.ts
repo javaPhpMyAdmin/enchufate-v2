@@ -151,6 +151,8 @@ export function useConfirmReservation(): UseConfirmReservationResult {
                 [reservation.renter_id],
                 'Reserva confirmada',
                 'Tu reserva fue confirmada por el host.',
+                undefined,
+                { type: 'reservation', reservationId: vars.id },
               );
             }
           })();

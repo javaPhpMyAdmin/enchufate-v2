@@ -167,6 +167,8 @@ export function useCancelReservation(): UseCancelReservationResult {
               [notifyUserId],
               'Reserva cancelada',
               'Una reserva fue cancelada.',
+              undefined,
+              { type: 'reservation', reservationId: vars.reservation.id },
             );
           }
         })();

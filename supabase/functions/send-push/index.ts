@@ -5,7 +5,7 @@
 //
 // **Endpoint**:
 //   POST { userIds: string[], title: string, body: string,
-//          notificationType?: string }
+//          notificationType?: string, data?: Record<string, string> }
 //   - userIds: array of auth.users UUIDs to notify
 //   - title: notification title (≤100 chars)
 //   - body: notification body (≤4000 chars)
@@ -13,6 +13,10 @@
 //     ('reservations' | 'messages' | 'reviews' | 'promotions').
 //     When provided, the function checks the recipient's preferences
 //     and skips users who have opted out of that type.
+//   - data: optional string-valued payload forwarded to the Expo
+//     push message. The client's notification-response listener
+//     reads it to navigate on tap (e.g. `{ type: 'reservation',
+//     reservationId }`).
 //
 // **Auth**: calls Supabase with service-role to query push_tokens
 // and notification_preferences.
@@ -49,6 +53,12 @@ interface PushRequest {
   body: string;
   /** Optional notification type for preference filtering. */
   notificationType?: 'reservations' | 'messages' | 'reviews' | 'promotions';
+  /**
+   * Optional string-valued payload forwarded to the Expo push
+   * message. The client's notification-response listener reads it
+   * to navigate on tap. String values only (APNs requirement).
+   */
+  data?: Record<string, string>;
 }
 
 function jsonResponse(status: number, body: Record<string, unknown>): Response {
@@ -101,7 +111,20 @@ Deno.serve(async (req: Request) => {
       typeof raw.notificationType === 'string' && validTypes.includes(raw.notificationType)
         ? raw.notificationType
         : undefined;
-    payload = { userIds: raw.userIds, title, body, notificationType };
+    // `data` must be a plain object with string values (APNs requires
+    // strings in the push envelope). Anything else is dropped.
+    let data: Record<string, string> | undefined;
+    if (
+      typeof raw.data === 'object' &&
+      raw.data !== null &&
+      !Array.isArray(raw.data)
+    ) {
+      data = {};
+      for (const [key, value] of Object.entries(raw.data)) {
+        if (typeof value === 'string') data[key] = value;
+      }
+    }
+    payload = { userIds: raw.userIds, title, body, notificationType, data };
   } catch {
     return jsonResponse(400, { ok: false, error: 'malformed_json' });
   }
@@ -147,6 +170,7 @@ Deno.serve(async (req: Request) => {
     sound: 'default',
     title: payload.title,
     body: payload.body,
+    ...(payload.data ? { data: payload.data } : {}),
   }));
 
   // Send in batches of 100 (Expo limit).
