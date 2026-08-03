@@ -5,6 +5,8 @@
  * in and the reservation exists). Renders the full reservation:
  *   - Charger info card (title, address, connector + power, price)
  *   - Other-party block (avatar + name + role label)
+ *   - Cancel-reason card (when `status === 'cancelada'` and a
+ *     `cancel_reason` was given — visible to both parties)
  *   - Time block (structured start_at – end_at OR the
  *     `horario_a_coordinar` free-text)
  *   - Status pill
@@ -355,6 +357,19 @@ export default function ReservationDetailScreen() {
           </View>
         </Card>
 
+        {/* Cancel reason — visible to both parties once a cancelled
+            reservation carries a reason. */}
+        {r.status === 'cancelada' && r.cancel_reason ? (
+          <Card
+            variant="default"
+            padding="md"
+            style={styles.cancelReasonCard}
+          >
+            <Text style={styles.cancelReasonTitle}>Motivo de cancelación</Text>
+            <Text style={styles.cancelReasonBody}>{r.cancel_reason}</Text>
+          </Card>
+        ) : null}
+
         {/* Actions */}
         <View style={styles.actions}>
           <Button
@@ -541,6 +556,18 @@ const styles = StyleSheet.create({
   partyText: { flex: 1, gap: 2 },
   partyName: { ...typography.heading, color: colors.textPrimary },
   partyRole: { ...typography.caption, color: colors.textSecondary },
+
+  cancelReasonCard: {
+    gap: spacing.sm,
+    backgroundColor: colors.dangerSurface,
+  },
+  cancelReasonTitle: {
+    ...typography.caption,
+    color: colors.danger,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  cancelReasonBody: { ...typography.body, color: colors.textPrimary },
 
   actions: { gap: spacing.sm, marginTop: spacing.md },
   cancelButton: {},

@@ -60,6 +60,7 @@ export const MOCK_RESERVATIONS: Reservation[] = [
     charging_started_at: null,
     created_at: '2026-07-18T10:00:00Z',
     updated_at: '2026-07-18T10:00:00Z',
+    cancel_reason: null,
     conversation_id: 'c1d2e3f4-0001-4000-8000-000000000001',
   },
   {
@@ -84,6 +85,7 @@ export const MOCK_RESERVATIONS: Reservation[] = [
     charging_started_at: null,
     created_at: '2026-07-17T15:00:00Z',
     updated_at: '2026-08-01T10:00:00Z',
+    cancel_reason: null,
     conversation_id: 'c1d2e3f4-0002-4000-8000-000000000002',
   },
   {
@@ -110,6 +112,7 @@ export const MOCK_RESERVATIONS: Reservation[] = [
     charging_started_at: '2026-07-31T09:20:00Z',
     created_at: '2026-07-30T12:00:00Z',
     updated_at: '2026-07-31T09:20:00Z',
+    cancel_reason: null,
     conversation_id: 'c1d2e3f4-0005-4000-8000-000000000005',
   },
   {
@@ -134,6 +137,7 @@ export const MOCK_RESERVATIONS: Reservation[] = [
     charging_started_at: null,
     created_at: '2026-07-12T12:00:00Z',
     updated_at: '2026-07-14T09:30:00Z',
+    cancel_reason: 'Finalmente no me convenía el horario.',
     conversation_id: 'c1d2e3f4-0003-4000-8000-000000000003',
   },
   {
@@ -159,6 +163,7 @@ export const MOCK_RESERVATIONS: Reservation[] = [
     charging_started_at: null,
     created_at: '2026-07-15T08:00:00Z',
     updated_at: '2026-07-20T12:00:00Z',
+    cancel_reason: null,
     conversation_id: 'c1d2e3f4-0004-4000-8000-000000000004',
   },
 ];

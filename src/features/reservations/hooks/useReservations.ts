@@ -165,7 +165,7 @@ export function useReservations(
       // to get the denormalized fields the UI expects.
       const SELECT_FIELDS = `
         id, charger_id, renter_id, start_at, end_at,
-        horario_a_coordinar, charging_started_at, status, created_at, updated_at,
+        horario_a_coordinar, charging_started_at, cancel_reason, status, created_at, updated_at,
         charger:chargers!reservations_charger_id_fkey(
           title, address, power_kw, connector_type, lat, lng, owner_id
         ),
@@ -280,6 +280,7 @@ export function useReservations(
           end_at: r.end_at,
           horario_a_coordinar: r.horario_a_coordinar,
           charging_started_at: r.charging_started_at ?? null,
+          cancel_reason: r.cancel_reason ?? null,
           status: r.status,
           created_at: r.created_at,
           updated_at: r.updated_at,

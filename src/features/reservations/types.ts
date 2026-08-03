@@ -49,6 +49,13 @@ export interface Reservation {
   horario_a_coordinar: string | null;
   /** ISO 8601 — set when the host starts charging (status → en_curso). */
   charging_started_at: string | null;
+  /**
+   * Optional free-text reason persisted when the reservation is
+   * cancelled (`status === 'cancelada'`); null otherwise. Shown on
+   * the detail screen so both parties know why the reservation fell
+   * through.
+   */
+  cancel_reason: string | null;
   status: ReservationStatus;
   created_at: string;
   updated_at: string;

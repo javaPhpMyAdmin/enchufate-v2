@@ -73,7 +73,7 @@ export function useReservation(
         .from('reservations')
         .select(`
           id, charger_id, renter_id, start_at, end_at,
-          horario_a_coordinar, charging_started_at, status, created_at, updated_at,
+          horario_a_coordinar, charging_started_at, cancel_reason, status, created_at, updated_at,
           charger:chargers!reservations_charger_id_fkey(
             title, address, power_kw, connector_type, lat, lng, owner_id
           ),
@@ -148,6 +148,7 @@ export function useReservation(
         end_at: data.end_at,
         horario_a_coordinar: data.horario_a_coordinar,
         charging_started_at: (data as any).charging_started_at ?? null,
+        cancel_reason: data.cancel_reason ?? null,
         status: data.status,
         created_at: data.created_at,
         updated_at: data.updated_at,
