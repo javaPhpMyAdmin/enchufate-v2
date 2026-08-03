@@ -139,21 +139,30 @@ export function useConfirmReservation(): UseConfirmReservationResult {
         void qc.invalidateQueries({ queryKey: ['reservation', vars.id] });
 
         // Push notification to the renter (fire-and-forget).
+        // try/catch: `sendPushNotification` swallows invoke errors
+        // but can reject on network failure — the push must never
+        // turn an otherwise-successful confirm into an unhandled
+        // rejection.
         if (isFeatureEnabled('PUSH_NOTIFICATIONS') && user?.id) {
           void (async () => {
-            const { data: reservation } = await supabase
-              .from('reservations')
-              .select('renter_id')
-              .eq('id', vars.id)
-              .single();
-            if (reservation?.renter_id && reservation.renter_id !== user.id) {
-              await sendPushNotification(
-                [reservation.renter_id],
-                'Reserva confirmada',
-                'Tu reserva fue confirmada por el host.',
-                undefined,
-                { type: 'reservation', reservationId: vars.id },
-              );
+            try {
+              const { data: reservation } = await supabase
+                .from('reservations')
+                .select('renter_id')
+                .eq('id', vars.id)
+                .single();
+              if (reservation?.renter_id && reservation.renter_id !== user.id) {
+                await sendPushNotification(
+                  [reservation.renter_id],
+                  'Reserva confirmada',
+                  'Tu reserva fue confirmada por el host.',
+                  undefined,
+                  { type: 'reservation', reservationId: vars.id },
+                );
+              }
+            } catch (err) {
+              // eslint-disable-next-line no-console
+              console.warn('[push] reservation confirm notification failed', err);
             }
           })();
         }

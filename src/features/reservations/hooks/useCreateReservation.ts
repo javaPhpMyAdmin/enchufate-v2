@@ -119,21 +119,30 @@ export function useCreateReservation(): UseCreateReservationResult {
         ]);
 
         // Push notification to the host (fire-and-forget).
+        // try/catch: `sendPushNotification` swallows invoke errors
+        // but can reject on network failure — the push must never
+        // turn an otherwise-successful create into an unhandled
+        // rejection.
         if (isFeatureEnabled('PUSH_NOTIFICATIONS') && user?.id) {
           void (async () => {
-            const { data: charger } = await supabase
-              .from('chargers')
-              .select('owner_id, title')
-              .eq('id', vars.chargerId)
-              .single();
-            if (charger?.owner_id && charger.owner_id !== user.id) {
-              await sendPushNotification(
-                [charger.owner_id],
-                'Nueva reserva',
-                `Alguien quiere reservar tu cargador "${charger.title}".`,
-                undefined,
-                { type: 'reservation', reservationId: _data.reservationId },
-              );
+            try {
+              const { data: charger } = await supabase
+                .from('chargers')
+                .select('owner_id, title')
+                .eq('id', vars.chargerId)
+                .single();
+              if (charger?.owner_id && charger.owner_id !== user.id) {
+                await sendPushNotification(
+                  [charger.owner_id],
+                  'Nueva reserva',
+                  `Alguien quiere reservar tu cargador "${charger.title}".`,
+                  undefined,
+                  { type: 'reservation', reservationId: _data.reservationId },
+                );
+              }
+            } catch (err) {
+              // eslint-disable-next-line no-console
+              console.warn('[push] reservation create notification failed', err);
             }
           })();
         }

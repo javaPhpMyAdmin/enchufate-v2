@@ -43,6 +43,7 @@ export function useNotifyCompletion(reservation: Reservation | undefined): void 
   useEffect(() => {
     if (!reservation) return;
     if (!isFeatureEnabled('CHARGER_REVIEWS')) return;
+    if (!isFeatureEnabled('PUSH_NOTIFICATIONS')) return;
     if (notifiedRef.current) return;
 
     const prevStatus = prevStatusRef.current;
@@ -68,12 +69,17 @@ export function useNotifyCompletion(reservation: Reservation | undefined): void 
     const chargerTitle = reservation.charger_title || 'tu cargador';
 
     // Fire-and-forget — push is best-effort, never blocks the UI.
-    void sendPushNotification(
+    // `.catch`: `sendPushNotification` swallows invoke errors but
+    // can reject on network failure.
+    sendPushNotification(
       [reservation.renter_id],
       'Reserva completada',
       `¿Cómo fue tu carga en ${chargerTitle}? Dejanos tu reseña`,
       undefined,
       { type: 'reservation', reservationId: reservation.id },
-    );
+    ).catch((err: unknown) => {
+      // eslint-disable-next-line no-console
+      console.warn('[push] completion notification failed', err);
+    });
   }, [reservation]);
 }

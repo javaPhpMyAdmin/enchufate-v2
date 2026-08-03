@@ -102,6 +102,10 @@ export function useCancelReservation(): UseCancelReservationResult {
         if (found) {
           found.status = 'cancelada';
           found.updated_at = new Date().toISOString();
+          // Persist the reason too so the detail screen's cancel-reason
+          // card shows up in the demo (the real path writes it to
+          // `cancel_reason` in the UPDATE payload below).
+          if (reason) found.cancel_reason = reason;
         }
         return;
       }
@@ -136,40 +140,48 @@ export function useCancelReservation(): UseCancelReservationResult {
       ]);
 
       // Push notification to the OTHER party (fire-and-forget).
+      // try/catch: `sendPushNotification` swallows invoke errors but
+      // can reject on network failure — the push must never turn an
+      // otherwise-successful cancel into an unhandled rejection.
       if (isFeatureEnabled('PUSH_NOTIFICATIONS') && user?.id) {
         void (async () => {
-          const { data: reservation } = await supabase
-            .from('reservations')
-            .select('renter_id, charger_id')
-            .eq('id', vars.reservation.id)
-            .single();
-          if (!reservation) return;
-
-          // Figure out who the OTHER party is.
-          // If I'm the renter → notify the host (via charger owner).
-          // If I'm the host → notify the renter.
-          let notifyUserId: string | null = null;
-          if (reservation.renter_id === user.id) {
-            // I'm the renter — find the host via charger.
-            const { data: charger } = await supabase
-              .from('chargers')
-              .select('owner_id')
-              .eq('id', reservation.charger_id)
+          try {
+            const { data: reservation } = await supabase
+              .from('reservations')
+              .select('renter_id, charger_id')
+              .eq('id', vars.reservation.id)
               .single();
-            notifyUserId = charger?.owner_id ?? null;
-          } else {
-            // I'm the host — notify the renter.
-            notifyUserId = reservation.renter_id;
-          }
+            if (!reservation) return;
 
-          if (notifyUserId && notifyUserId !== user.id) {
-            await sendPushNotification(
-              [notifyUserId],
-              'Reserva cancelada',
-              'Una reserva fue cancelada.',
-              undefined,
-              { type: 'reservation', reservationId: vars.reservation.id },
-            );
+            // Figure out who the OTHER party is.
+            // If I'm the renter → notify the host (via charger owner).
+            // If I'm the host → notify the renter.
+            let notifyUserId: string | null = null;
+            if (reservation.renter_id === user.id) {
+              // I'm the renter — find the host via charger.
+              const { data: charger } = await supabase
+                .from('chargers')
+                .select('owner_id')
+                .eq('id', reservation.charger_id)
+                .single();
+              notifyUserId = charger?.owner_id ?? null;
+            } else {
+              // I'm the host — notify the renter.
+              notifyUserId = reservation.renter_id;
+            }
+
+            if (notifyUserId && notifyUserId !== user.id) {
+              await sendPushNotification(
+                [notifyUserId],
+                'Reserva cancelada',
+                'Una reserva fue cancelada.',
+                undefined,
+                { type: 'reservation', reservationId: vars.reservation.id },
+              );
+            }
+          } catch (err) {
+            // eslint-disable-next-line no-console
+            console.warn('[push] reservation cancel notification failed', err);
           }
         })();
       }
