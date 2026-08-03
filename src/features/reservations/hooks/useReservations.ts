@@ -5,23 +5,31 @@
  * `MOCK_RESERVATIONS` by `role` (renter = `renter_id === uid`;
  * host = `host_id === uid`).
  *
- * **Phase 7 (this commit — Realtime subscription)**:
+ * **Phase 7 (Realtime subscription)**:
  *   - The mock fetch path is preserved (the user hasn't applied
  *     the SQL migrations yet + the MOCK_SUPABASE flag is on by
  *     default).
  *  - When the MOCK_SUPABASE flag is OFF (real mode), the hook
  *     subscribes to a Supabase Realtime channel
  *     (`reservations:user={uid}` + unique suffix, see below) on
- *     mount and invalidates the
- *     `['reservations']` cache on any `*` change. Cleanup:
- *     `supabase.removeChannel(channel)` on unmount.
- *  - The filter covers BOTH the renter and host paths with a
- *    two-sided `or(...)` filter: `renter_id = eq.{uid}` covers the
- *    renter side; `charger_id = in.(owned_ids)` covers the host
- *    side (owned ids resolved from `chargers.owner_id` — the
- *    reservations table has no host column). Re-subscribing on
- *    `role` change keeps the owned-charger set fresh. Before this
- *    fix the channel only listened to the renter side, so host-side
+ *     mount and invalidates the `['reservations']` cache on any
+ *     `*` change. Cleanup: `supabase.removeChannel(channel)` on
+ *     unmount.
+ *  - The channel covers BOTH the renter and host paths. Realtime
+ *    enforces RLS, so the `reservations_select_party` policy
+ *    (renter_id = auth.uid() OR charger owner) already scopes
+ *    delivery to both sides of a reservation; a server-side
+ *    `or(...)` filter is NOT valid `postgres_changes` grammar
+ *    (only `column=op.value` AND-combined filters are). The hook
+ *    therefore subscribes WITHOUT a filter and filters
+ *    client-side in the callback: an event counts when
+ *    `renter_id = {uid}` or `charger_id` is in the user's
+ *    owned-charger set (resolved from `chargers.owner_id` — the
+ *    reservations table has no host column). The owned set lives
+ *    in a mutable box and is re-resolved on every SUBSCRIBED
+ *    status + `role` change, so a host who publishes a new
+ *    charger is picked up without re-subscribing. Before this fix
+ *    the channel only listened to the renter side, so host-side
  *    events (guest books/cancels on the host's charger) never
  *    invalidated the host tab.
  *   - The real-mode SELECT path is left as a TODO — the user
@@ -63,20 +71,24 @@ export function useReservations(
 
   // ----- Realtime subscription (real mode only) -----
   // The mock path keeps the `staleTime: 15_000` cache. The real
-  // path subscribes to a TWO-SIDED `postgres_changes` filter so
-  // events on BOTH sides of the reservation invalidate the cache:
-  //   - renter side: `renter_id = eq.{uid}`
-  //   - host side:   `charger_id = in.(owned ids)` — the user's
-  //     chargers, resolved once per subscription from
-  //     `chargers.owner_id` (the reservations table has no host
-  //     column). Degrades to renter-only when the user owns no
-  //     chargers.
+  // path subscribes to `postgres_changes` so events on BOTH sides
+  // of the reservation invalidate the cache:
+  //   - renter side: `renter_id = auth.uid()`
+  //   - host side:   the user owns the `charger_id`
+  // Realtime enforces RLS, so the `reservations_select_party`
+  // policy already scopes delivery to exactly those two cases. We
+  // do NOT pass a server-side filter — `or(...)` is not valid
+  // `postgres_changes` grammar (only `column=op.value` filters,
+  // AND-combined with commas) — and filter client-side in the
+  // callback instead. The owned-charger set lives in a mutable box
+  // (`ownedIdsBox`) and is re-resolved on every SUBSCRIBED status
+  // + `role` change, so a host who publishes a new charger is
+  // picked up without re-subscribing.
   // `role` is in the effect deps so switching the segmented tab
-  // re-subscribes and re-resolves the owned-charger set (a host may
-  // publish new chargers between visits). We invalidate rather than
-  // setQueryData because the server-side payload doesn't tell us
-  // which tab (renter / host) the change belongs to — the role
-  // filter is client-side in the queryFn.
+  // re-subscribes and re-resolves the owned-charger set. We
+  // invalidate rather than setQueryData because the server-side
+  // payload doesn't tell us which tab (renter / host) the change
+  // belongs to — the role filter is client-side in the queryFn.
   //
   // The channel name embeds `uniqueChannelId()` so every effect run
   // registers a brand-new channel. `supabase.channel(name)` returns an
@@ -93,40 +105,92 @@ export function useReservations(
     let cancelled = false;
     let channel: RealtimeChannel | null = null;
 
-    // The host-side half of the filter needs the user's charger ids.
-    // Resolve them before subscribing; if the user owns no chargers
-    // yet, the filter degrades to the renter-only half.
-    void (async () => {
-      const { data: chargers } = await supabase
+    // Mutable box for the owned-charger set — the postgres_changes
+    // callback reads it on every event, so the freshest set wins
+    // even when the resolution finishes after the subscription.
+    const ownedIdsBox: { current: string[] } = { current: [] };
+
+    const resolveOwnedIds = async (): Promise<void> => {
+      const { data: chargers, error: chargersErr } = await supabase
         .from('chargers')
         .select('id')
         .eq('owner_id', uid);
       if (cancelled) return;
+      if (chargersErr) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[realtime] failed to resolve owned charger ids',
+          chargersErr.message,
+        );
+        return;
+      }
+      const next = (chargers ?? []).map((c) => c.id);
+      const grew =
+        next.length > ownedIdsBox.current.length ||
+        next.some((id) => !ownedIdsBox.current.includes(id));
+      ownedIdsBox.current = next;
+      // If the owned set grew while the channel was live, host-side
+      // events may have been dropped by the client-side filter —
+      // refetch so the host tab catches up.
+      if (grew) {
+        void queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      }
+    };
 
-      const ownedIds = (chargers ?? []).map((c) => c.id);
-      const filter =
-        ownedIds.length > 0
-          ? `or=(renter_id.eq.${uid},charger_id.in.(${ownedIds.join(',')}))`
-          : `renter_id.eq.${uid}`;
+    channel = supabase
+      .channel(`reservations:user=${uid}:${uniqueChannelId()}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'reservations',
+        },
+        (payload) => {
+          // DELETE events carry the row in `old`; everything else in
+          // `new`. The payload type is a union of insert/update/
+          // delete variants, so pick the populated half and read only
+          // the fields the client-side filter needs.
+          const row = (
+            payload.eventType === 'DELETE' ? payload.old : payload.new
+          ) as
+            | { id?: string; renter_id?: string; charger_id?: string }
+            | undefined;
+          if (!row) return;
 
-      channel = supabase
-        .channel(`reservations:user=${uid}:${uniqueChannelId()}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'reservations',
-            filter,
-          },
-          () => {
-            // Invalidate the broad key so both the renter + host
-            // tabs refetch on the next render.
-            void queryClient.invalidateQueries({ queryKey: ['reservations'] });
-          },
-        )
-        .subscribe();
-    })();
+          const belongsToUser =
+            row.renter_id === uid ||
+            (row.charger_id !== undefined &&
+              ownedIdsBox.current.includes(row.charger_id));
+          if (!belongsToUser) return;
+
+          // Invalidate the broad key so both the renter + host tabs
+          // refetch on the next render...
+          void queryClient.invalidateQueries({ queryKey: ['reservations'] });
+          // ...and the single-reservation key so an open detail
+          // screen refreshes too (the detail hook keys on
+          // `['reservation', id]`).
+          if (row.id) {
+            void queryClient.invalidateQueries({
+              queryKey: ['reservation', row.id],
+            });
+          }
+        },
+      )
+      .subscribe((status, err) => {
+        if (status !== 'SUBSCRIBED') {
+          // eslint-disable-next-line no-console
+          console.warn('[realtime] reservations channel status:', status, err?.message);
+        } else {
+          // Re-resolve owned ids on a fresh subscription so a host
+          // who published a new charger while the tab was covered
+          // gets picked up.
+          void resolveOwnedIds();
+        }
+      });
+
+    // First resolution — populate the owned set as soon as possible.
+    void resolveOwnedIds();
 
     return () => {
       cancelled = true;
@@ -289,5 +353,11 @@ export function useReservations(
       });
     },
     staleTime: 15_000,
+    // Realtime-outage fallback: the channel above is the fast path,
+    // but a silent network blip can drop it without a status event.
+    // The 30s interval keeps the list fresh no matter what; when the
+    // channel is healthy this only duplicates an already-recent fetch
+    // (staleTime 15s), so the cost is one extra query per minute.
+    refetchInterval: 30_000,
   });
 }
