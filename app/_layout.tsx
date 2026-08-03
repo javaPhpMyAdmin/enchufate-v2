@@ -49,7 +49,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { persistQueryClient } from '@tanstack/query-persist-client-core';
 import { Asset } from 'expo-asset';
 import * as Notifications from 'expo-notifications';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useNavigationContainerRef } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -72,6 +72,17 @@ export default function RootLayout() {
   useSession();
   useRegisterPushToken();
 
+  // Readiness signal for the push-response handlers below. The
+  // imperative `router.push` throws "Attempted to navigate before
+  // mounting the Root Layout component" when the NavigationContainer
+  // is not ready yet (iOS cold start from a notification tap).
+  // `useRootNavigationState` is NOT usable here — it resolves the
+  // internal `__root` slot via `getParent`, which only exists from
+  // screens, so it throws in the layout itself. The container ref is
+  // the layout-safe equivalent of the exact check `router.push`
+  // performs (`navigationRef.isReady()`).
+  const navigationRef = useNavigationContainerRef();
+
   // ----- Push response listener (notification deep links) -----
   // Registered once at the root layout — the same lifecycle as the
   // push token registration. Tapping a reservation push navigates to
@@ -81,27 +92,80 @@ export default function RootLayout() {
   useEffect(() => {
     if (!isFeatureEnabled('PUSH_NOTIFICATIONS')) return;
 
+    // Dedupe: iOS can deliver the SAME launch response both through
+    // `getLastNotificationResponse()` (cold start) and through the
+    // listener (if the listener registered before the tap landed).
+    // Keying on the request identifier makes the second delivery a
+    // no-op.
+    const handledIds = new Set<string>();
+
+    // Navigate with a readiness gate + backoff. `router.push` throws
+    // when the NavigationContainer is not ready (cold start on iOS:
+    // the response is read at layout mount, before the navigator has
+    // committed its initial state). We retry up to 3 times ~400ms
+    // apart; if the navigator never becomes ready we give up
+    // gracefully — the caller clears the stored response either way,
+    // so a later remount never re-navigates.
+    const navigateToReservation = (
+      reservationId: string,
+      attemptsLeft: number,
+    ): void => {
+      if (navigationRef.current == null) {
+        if (attemptsLeft > 0) {
+          setTimeout(
+            () => navigateToReservation(reservationId, attemptsLeft - 1),
+            400,
+          );
+        }
+        return;
+      }
+      try {
+        router.push({
+          pathname: '/reservation/[id]',
+          params: { id: reservationId },
+        });
+      } catch (err) {
+        // The ref gate covers the common case; this catches the
+        // residual race where `isReady()` is still false while the
+        // container ref is set. Same backoff, then drop.
+        if (attemptsLeft > 0) {
+          setTimeout(
+            () => navigateToReservation(reservationId, attemptsLeft - 1),
+            400,
+          );
+        } else {
+          // eslint-disable-next-line no-console
+          console.warn('[push] failed to navigate to reservation', err);
+        }
+      }
+    };
+
     const handleResponse = (response: Notifications.NotificationResponse) => {
       const data = response.notification.request.content.data;
       if (
         data?.type === 'reservation' &&
         typeof data.reservationId === 'string'
       ) {
-        router.push({
-          pathname: '/reservation/[id]',
-          params: { id: data.reservationId },
-        });
+        const requestId = response.notification.request.identifier;
+        if (handledIds.has(requestId)) return;
+        handledIds.add(requestId);
+        try {
+          navigateToReservation(data.reservationId, 3);
+        } finally {
+          // Always consume the stored response — a later remount
+          // (e.g. HMR) or re-delivery must not re-navigate to the
+          // same reservation.
+          Notifications.clearLastNotificationResponse();
+        }
       }
     };
 
     // Cold start: when the app is launched from a notification tap
     // the response is not re-delivered to the listener, so read the
-    // last one. Clear it afterwards so a later remount (e.g. HMR)
-    // doesn't re-navigate to the same reservation.
+    // last one. `handleResponse` clears it in its finally block.
     const lastResponse = Notifications.getLastNotificationResponse();
     if (lastResponse) {
       handleResponse(lastResponse);
-      Notifications.clearLastNotificationResponse();
     }
 
     const subscription =
